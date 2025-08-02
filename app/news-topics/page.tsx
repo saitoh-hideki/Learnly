@@ -186,8 +186,16 @@ export default function NewsTopicsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117]">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-[#0e1a2a] relative overflow-hidden">
+      {/* Enhanced Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-sky-500/8 to-transparent"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-t from-blue-600/5 to-transparent rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-br from-indigo-500/3 to-purple-500/3 rounded-full blur-3xl"></div>
+        <div className="absolute top-2/3 right-1/3 w-48 h-48 bg-gradient-to-bl from-emerald-500/2 to-teal-500/2 rounded-full blur-2xl"></div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
@@ -195,7 +203,7 @@ export default function NewsTopicsPage() {
               variant="ghost"
               size="icon"
               onClick={() => router.push('/dashboard')}
-              className="hover:bg-gray-800 rounded-xl text-gray-300 hover:text-white"
+              className="hover:bg-slate-800/50 rounded-xl text-slate-300 hover:text-cyan-200 transition-all"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -205,7 +213,7 @@ export default function NewsTopicsPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">ニューステーマを選択</h1>
-                <p className="text-gray-400">学習したい分野を最大3つ選んでください</p>
+                <p className="text-slate-400">学習したい分野を最大3つ選んでください</p>
               </div>
             </div>
           </div>
@@ -213,12 +221,12 @@ export default function NewsTopicsPage() {
 
         {/* Selection Info */}
         <div className="mb-8">
-          <Card className="bg-[#1c1f26] border border-gray-700 rounded-2xl">
+          <Card className="bg-[#1c1f26] border border-slate-700/50 rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-2">選択状況</h3>
-                  <p className="text-gray-400 text-sm">
+                  <p className="text-slate-400 text-sm">
                     {selectedTopics.length}/3 のテーマを選択中
                   </p>
                 </div>
@@ -226,8 +234,8 @@ export default function NewsTopicsPage() {
                   variant="secondary" 
                   className={`text-sm px-3 py-1 ${
                     selectedTopics.length === 3 
-                      ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                      : 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                      ? 'bg-gradient-to-r from-slate-200 to-cyan-200 text-slate-800 border-0' 
+                      : 'bg-gradient-to-r from-sky-400 to-cyan-300 text-black border-0'
                   }`}
                 >
                   {selectedTopics.length === 3 ? '最大数選択済み' : '選択可能'}
@@ -250,30 +258,30 @@ export default function NewsTopicsPage() {
                 key={topic.id}
                 className={`cursor-pointer transition-all duration-300 border-2 ${
                   isSelected
-                    ? 'border-sky-400 bg-gradient-to-r from-sky-500/10 to-indigo-500/10 shadow-lg'
+                    ? 'border-cyan-400 bg-gradient-to-r from-sky-400/10 to-cyan-300/10 shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:ring-1 hover:ring-cyan-500/30'
                     : isDisabled
-                    ? 'border-gray-700 bg-[#1c1f26] opacity-50'
-                    : 'border-gray-700 bg-[#1c1f26] hover:border-gray-600 hover:shadow-md'
-                } rounded-2xl`}
+                    ? 'border-slate-700/50 bg-[#1c1f26] opacity-50'
+                    : 'border-slate-700/50 bg-[#1c1f26] hover:border-cyan-400/50 hover:shadow-md hover:ring-1 hover:ring-cyan-500/30'
+                } rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]`}
                 onClick={() => !isDisabled && handleTopicToggle(topic.id)}
               >
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between mb-4">
                     <div className="text-4xl">{topic.icon}</div>
                     {isSelected && (
-                      <div className="p-2 bg-sky-500 rounded-full shadow-lg">
-                        <Check className="h-4 w-4 text-white" />
+                      <div className="p-2 bg-gradient-to-r from-sky-400 to-cyan-300 rounded-full shadow-lg">
+                        <Check className="h-4 w-4 text-black" />
                       </div>
                     )}
                   </div>
                   <CardTitle className="text-lg font-semibold text-white mb-2">
                     {topic.name}
                   </CardTitle>
-                  <CardDescription className="text-gray-400 text-sm leading-relaxed mb-3">
+                  <CardDescription className="text-slate-400 text-sm leading-relaxed mb-3">
                     {topic.description}
                   </CardDescription>
                   {/* 最終取得日表示 */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
                     <Clock className="h-3 w-3" />
                     <span>
                       {lastFetchDate 
@@ -286,27 +294,27 @@ export default function NewsTopicsPage() {
                   {/* 最新ニュース表示 */}
                   {latestNewsItem && (
                     <div className="mt-3">
-                      <div className="text-sm text-gray-400 line-clamp-3 leading-relaxed">
+                      <div className="text-sm text-slate-400 line-clamp-3 leading-relaxed">
                         {truncateSummary(latestNewsItem.summary, 120)}
                       </div>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-sky-500 underline">
+                        <span className="text-xs text-cyan-300 underline">
                           出典: {latestNewsItem.source}
                         </span>
-                        <ExternalLink className="h-3 w-3 text-gray-500" />
+                        <ExternalLink className="h-3 w-3 text-slate-500" />
                       </div>
                     </div>
                   )}
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-2">
-                    <p className="text-xs text-gray-500 font-medium">例：</p>
+                    <p className="text-xs text-slate-500 font-medium">例：</p>
                     <div className="flex flex-wrap gap-1">
                       {topic.examples.map((example, index) => (
                         <Badge
                           key={index}
                           variant="outline"
-                          className="text-xs border-gray-600 text-gray-400"
+                          className="text-xs border-slate-600/50 text-slate-400"
                         >
                           {example}
                         </Badge>
@@ -324,7 +332,7 @@ export default function NewsTopicsPage() {
           <Button
             onClick={handleContinue}
             disabled={selectedTopics.length === 0 || isLoading}
-            className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white rounded-xl shadow-md px-8 py-3 text-lg font-medium"
+            className="bg-gradient-to-r from-sky-400 to-cyan-300 hover:scale-[1.02] text-black rounded-xl shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:shadow-[0_15px_40px_rgba(56,189,248,0.3)] px-8 py-3 text-lg font-medium transition-all"
           >
             {isLoading ? (
               '設定中...'
@@ -339,7 +347,7 @@ export default function NewsTopicsPage() {
 
         {/* Help Text */}
         <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
+          <p className="text-slate-400 text-sm">
             選択したテーマに基づいて、毎日最新のニュースを取得します。
             <br />
             後から設定画面から変更することも可能です。
