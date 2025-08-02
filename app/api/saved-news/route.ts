@@ -1,26 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Supabaseクライアントの設定
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    
-    // Verify JWT token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     // Get query parameters
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
@@ -31,7 +19,6 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('saved_news')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -46,7 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch saved news' }, { status: 500 })
     }
 
-    return NextResponse.json({ savedNews })
+    return NextResponse.json({ savedNews: savedNews || [] })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -55,45 +42,57 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
+    console.log('POST /api/saved-news called')
+    console.log('Supabase URL:', supabaseUrl)
+    console.log('Supabase Anon Key exists:', !!supabaseAnonKey)
     
-    // Verify JWT token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json()
+    console.log('Request body:', body)
     const { title, summary, url, source, category, publishedAt, topics } = body
 
     // Validate required fields
     if (!title || !summary || !url || !source || !category) {
+      console.error('Missing required fields:', { title, summary, url, source, category })
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    console.log('Checking for existing news with URL:', url)
     // Check if news is already saved
-    const { data: existingNews } = await supabase
+    const { data: existingNews, error: checkError } = await supabase
       .from('saved_news')
       .select('id')
-      .eq('user_id', user.id)
       .eq('url', url)
       .single()
 
+    console.log('Check result:', { existingNews, checkError })
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+      console.error('Error checking existing news:', checkError)
+      // RLSエラーの場合は、既存チェックをスキップして直接挿入を試行
+      console.log('Skipping existing check due to RLS error, proceeding with insert')
+    }
+
     if (existingNews) {
+      console.log('News already exists:', existingNews)
       return NextResponse.json({ error: 'News already saved' }, { status: 409 })
     }
+
+    console.log('Inserting new news with data:', {
+      user_id: '00000000-0000-0000-0000-000000000000',
+      title,
+      summary,
+      url,
+      source,
+      category,
+      published_at: publishedAt,
+      topics: topics || []
+    })
 
     // Insert new saved news
     const { data: savedNews, error } = await supabase
       .from('saved_news')
       .insert({
-        user_id: user.id,
+        user_id: '00000000-0000-0000-0000-000000000000', // プロトタイプ用のダミーユーザーID
         title,
         summary,
         url,
@@ -105,11 +104,14 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
+    console.log('Insert result:', { savedNews, error })
+
     if (error) {
       console.error('Error saving news:', error)
-      return NextResponse.json({ error: 'Failed to save news' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to save news', details: error.message }, { status: 500 })
     }
 
+    console.log('News saved successfully:', savedNews)
     return NextResponse.json({ savedNews })
   } catch (error) {
     console.error('Unexpected error:', error)
@@ -119,20 +121,6 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    
-    // Verify JWT token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -145,7 +133,6 @@ export async function DELETE(request: NextRequest) {
       .from('saved_news')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id)
 
     if (error) {
       console.error('Error deleting saved news:', error)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Send, BookOpen, Sparkles, Newspaper, FileText } from 'lucide-react'
+import { ArrowLeft, Send, BookOpen, Sparkles, FileText, Bot, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,10 +26,11 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [news, setNews] = useState<any[]>([])
+  const [selectedNews, setSelectedNews] = useState<any[]>([])
   const [showReview, setShowReview] = useState(false)
   const [review, setReview] = useState<any>(null)
   const [hasInitialized, setHasInitialized] = useState(false)
+  const [showSelectedNews, setShowSelectedNews] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { currentSession, createSession, addMessage, saveReview } = useStore()
 
@@ -38,103 +39,41 @@ export default function ChatPage() {
   useEffect(() => {
     if (mode && !currentSession) {
       createSession(mode.id)
-      fetchNews()
     }
-  }, [mode])
+  }, [mode, currentSession])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // クエリパラメータから初期メッセージを取得して自動送信
+  // クエリパラメータから選択されたニュースを取得（自動チャット開始はしない）
   useEffect(() => {
-    const initialMessage = searchParams.get('initialMessage')
-    const articleId = searchParams.get('articleId')
+    const newsIds = searchParams.get('newsIds')
+    const category = searchParams.get('category')
     
-    if (initialMessage && !hasInitialized && currentSession) {
+    if (newsIds && !hasInitialized && currentSession) {
       setHasInitialized(true)
-      // 初期メッセージを自動送信
-      setTimeout(() => {
-        handleInitialMessage(initialMessage, articleId)
-      }, 1000) // 1秒後に自動送信
+      // 選択されたニュースを取得
+      fetchSelectedNews(newsIds.split(','))
     }
   }, [searchParams, hasInitialized, currentSession])
 
-  const handleInitialMessage = async (message: string, articleId?: string | null) => {
-    const userMessage: Message = {
-      role: 'user',
-      content: message,
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setIsLoading(true)
-
-    if (currentSession) {
-      addMessage(currentSession.id, {
-        role: userMessage.role,
-        content: userMessage.content
-      })
-    }
-
+  const fetchSelectedNews = async (newsIds: string[]) => {
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [userMessage],
-          mode,
-          articleId
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to send message')
-
-      const data = await response.json()
-      
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date()
-      }
-
-      setMessages(prev => [...prev, assistantMessage])
-
-      if (currentSession) {
-        addMessage(currentSession.id, {
-          role: assistantMessage.role,
-          content: assistantMessage.content
-        })
+      const response = await fetch('/api/saved-news')
+      if (response.ok) {
+        const { savedNews } = await response.json()
+        const selected = savedNews.filter((news: any) => newsIds.includes(news.id))
+        setSelectedNews(selected)
       }
     } catch (error) {
-      console.error('Error sending message:', error)
-    } finally {
-      setIsLoading(false)
+      console.error('Error fetching selected news:', error)
     }
   }
 
-  const fetchNews = async () => {
-    if (!mode) return
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('fetch-news', {
-        body: {
-          topic: mode.name
-        }
-      })
 
-      if (error) {
-        console.error('Supabase function error:', error)
-        return
-      }
 
-      if (data && data.articles) {
-        setNews(data.articles || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch news:', error)
-    }
-  }
+
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -157,66 +96,74 @@ export default function ChatPage() {
     }
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          mode
-        })
+      // 最初のメッセージの場合、選択されたニュースの情報を含める
+      const isFirstMessage = messages.length === 0
+      const requestBody = {
+        messages: [...messages, userMessage],
+        mode,
+        selectedNews,
+        isFirstMessage
+      }
+
+      // エッジファンクションを呼び出してレスポンスを取得
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: requestBody
       })
 
-      if (!response.ok) throw new Error('Failed to send message')
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`)
+      }
 
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
+      // レスポンスからメッセージを取得
       let assistantMessage = ''
+      if (data && data.choices && data.choices[0]?.message?.content) {
+        assistantMessage = data.choices[0].message.content
+      }
 
-      while (reader) {
-        const { done, value } = await reader.read()
-        if (done) break
+      // ストリーミング効果を実装
+      if (assistantMessage) {
+        // 最初に空のメッセージを追加
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages.push({
+            role: 'assistant',
+            content: '',
+            timestamp: new Date()
+          })
+          return newMessages
+        })
 
-        const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
+        // 文字単位でストリーミング効果を作る
+        const chars = assistantMessage.split('')
+        let currentMessage = ''
+        
+        for (let i = 0; i < chars.length; i++) {
+          currentMessage += chars[i]
+          
+          setMessages(prev => {
+            const newMessages = [...prev]
+            const lastMessage = newMessages[newMessages.length - 1]
             
-            try {
-              const json = JSON.parse(data)
-              assistantMessage += json.text
-              
-              setMessages(prev => {
-                const newMessages = [...prev]
-                const lastMessage = newMessages[newMessages.length - 1]
-                
-                if (lastMessage?.role === 'assistant') {
-                  lastMessage.content = assistantMessage
-                } else {
-                  newMessages.push({
-                    role: 'assistant',
-                    content: assistantMessage,
-                    timestamp: new Date()
-                  })
-                }
-                
-                return newMessages
-              })
-            } catch (e) {
-              console.error('Failed to parse SSE data:', e)
+            if (lastMessage?.role === 'assistant') {
+              lastMessage.content = currentMessage
             }
-          }
+            
+            return newMessages
+          })
+          
+          // 文字ごとに少し遅延を入れてストリーミング効果を作る
+          await new Promise(resolve => setTimeout(resolve, 20))
         }
       }
 
-      if (currentSession) {
+      if (currentSession && assistantMessage) {
         addMessage(currentSession.id, {
           role: 'assistant',
           content: assistantMessage
         })
       }
+
+
     } catch (error) {
       console.error('Failed to send message:', error)
     } finally {
@@ -311,33 +258,50 @@ export default function ChatPage() {
         <div className="flex-1 flex gap-4 overflow-hidden">
           {/* Main Chat Area */}
           <div className="flex-1 flex flex-col">
-            {/* News Section */}
-            {news.length > 0 && (
+            {/* Selected News Section */}
+            {selectedNews.length > 0 && (
               <Card className="mb-4 bg-[#1c1f26] border border-gray-700">
                 <CardHeader className="py-3">
-                  <CardTitle className="text-sm flex items-center gap-2 text-white">
-                    <Newspaper className="h-4 w-4 text-sky-400" />
-                    関連ニュース
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="py-2">
-                  <div className="flex gap-2 overflow-x-auto">
-                    {news.map((article, idx) => (
-                      <a
-                        key={idx}
-                        href={article.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="min-w-[200px] p-2 rounded-lg border border-gray-600 hover:bg-gray-800 transition-colors"
-                      >
-                        <p className="text-xs font-medium line-clamp-2 text-gray-300">{article.title}</p>
-                        <p className="text-xs text-gray-500 mt-1">{article.source}</p>
-                      </a>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm flex items-center gap-2 text-white">
+                      <BookOpen className="h-4 w-4 text-green-400" />
+                      選択されたニュース ({selectedNews.length}件)
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSelectedNews(!showSelectedNews)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      {showSelectedNews ? '折りたたむ' : '展開'}
+                    </Button>
                   </div>
-                </CardContent>
+                </CardHeader>
+                {showSelectedNews && (
+                  <CardContent className="py-2">
+                    <div className="flex gap-2 overflow-x-auto">
+                      {selectedNews.map((article, idx) => (
+                        <div
+                          key={article.id}
+                          className="min-w-[250px] p-3 rounded-lg border border-green-600 bg-green-500/10"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <Badge variant="outline" className="text-xs border-green-600 text-green-400">
+                              {idx + 1}
+                            </Badge>
+                            <span className="text-xs text-gray-400">{article.source}</span>
+                          </div>
+                          <p className="text-xs font-medium line-clamp-2 text-white mb-2">{article.title}</p>
+                          <p className="text-xs text-gray-400 line-clamp-2">{article.summary}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
+
+
 
             {/* Chat Messages */}
             <Card className="flex-1 flex flex-col bg-[#1c1f26]/80 backdrop-blur-sm border border-gray-700 shadow-lg rounded-2xl">
@@ -360,11 +324,33 @@ export default function ChatPage() {
                         <div
                           className={`max-w-[75%] rounded-2xl px-6 py-4 shadow-sm ${
                             message.role === 'user'
-                              ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white'
-                              : 'bg-[#1c1f26] border border-gray-600 text-gray-300'
+                              ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white ml-auto shadow-lg'
+                              : 'bg-[#1c1f26] border border-gray-600 text-gray-300 mr-auto shadow-md'
                           }`}
                         >
-                          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                          <div className="flex items-start gap-3">
+                            {message.role === 'assistant' && (
+                              <div className="w-8 h-8 bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <Bot className="h-4 w-4 text-sky-400" />
+                              </div>
+                            )}
+                            <div className="flex-1">
+                              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                              <div className={`text-xs text-gray-500 mt-2 ${
+                                message.role === 'user' ? 'text-right' : 'text-left'
+                              }`}>
+                                {message.timestamp.toLocaleTimeString('ja-JP', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </div>
+                            </div>
+                            {message.role === 'user' && (
+                              <div className="w-8 h-8 bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <User className="h-4 w-4 text-white" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}

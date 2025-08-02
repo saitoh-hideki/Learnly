@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode } = await req.json()
+    const { messages, mode, category, selectedNews, isFirstMessage } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
@@ -21,7 +21,7 @@ serve(async (req) => {
       )
     }
 
-    const systemPrompt = `あなたはLearnlyの学習支援AIアシスタントです。
+    let systemPrompt = `あなたはLearnlyの学習支援AIアシスタントです。
 ユーザーが選択した「${mode?.name || '学習'}」分野について、以下の方針で対話してください：
 
 1. 深い理解を促す質問を投げかける
@@ -31,6 +31,23 @@ serve(async (req) => {
 5. 日本語で丁寧に、かつ親しみやすく対話する
 
 ユーザーが疑問を持った場合は、分かりやすく段階的に説明してください。`
+
+    // 最初のメッセージで選択されたニュースがある場合、挨拶から始める
+    if (isFirstMessage && selectedNews && selectedNews.length > 0) {
+      const newsTitles = selectedNews.map((news: any) => news.title).join('、')
+      const newsContext = selectedNews.map((news: any, index: number) => 
+        `【ニュース${index + 1}】${news.title}\n${news.summary}`
+      ).join('\n\n')
+      
+      systemPrompt += `\n\nユーザーが選択したニュース記事の情報：\n${newsContext}\n\nこれは最初のメッセージです。選択されたニュース記事（${newsTitles}）の内容を読み取り、「こんにちは！今日は${newsTitles}についての勉強ですね。」のような挨拶から始めて、これらのニュース記事を基にした学習を提案してください。`
+    } else if (selectedNews && selectedNews.length > 0) {
+      // 通常のメッセージで選択されたニュースがある場合
+      const newsContext = selectedNews.map((news: any, index: number) => 
+        `【ニュース${index + 1}】${news.title}\n${news.summary}`
+      ).join('\n\n')
+      
+      systemPrompt += `\n\nユーザーが選択したニュース記事の情報：\n${newsContext}\n\nこれらのニュース記事を参考にしながら、より具体的で深い学習をサポートしてください。`
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -46,6 +63,7 @@ serve(async (req) => {
         ],
         temperature: 0.7,
         max_tokens: 1000,
+        stream: false,
       }),
     })
 

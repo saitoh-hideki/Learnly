@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Bookmark, Trash2, Search, Filter, Calendar, ExternalLink, MessageSquare, Zap } from 'lucide-react'
+import { ArrowLeft, Search, Trash2, Download, MessageSquare, BookOpen, FileText } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 
 interface SavedNews {
@@ -54,18 +54,8 @@ export default function NewsArchivePage() {
   const fetchSavedNews = async () => {
     try {
       setIsLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        router.push('/login')
-        return
-      }
 
-      const response = await fetch('/api/saved-news', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
+      const response = await fetch('/api/saved-news')
 
       if (response.ok) {
         const { savedNews } = await response.json()
@@ -84,15 +74,8 @@ export default function NewsArchivePage() {
   // ニュースを削除
   const deleteNews = async (id: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) return
-
       const response = await fetch(`/api/saved-news?id=${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
+        method: 'DELETE'
       })
 
       if (response.ok) {
@@ -165,13 +148,13 @@ export default function NewsArchivePage() {
               </Button>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
-                  <Bookmark className="h-6 w-6 text-white" />
+                  <BookOpen className="h-6 w-6 text-white" />
                 </div>
                 <h1 className="text-3xl font-bold text-white">保存されたニュース</h1>
               </div>
             </div>
             <div className="text-sm text-gray-400 bg-[#1c1f26] px-4 py-2 rounded-xl shadow-sm border border-gray-700">
-              <Calendar className="h-4 w-4 inline mr-2" />
+              <FileText className="h-4 w-4 inline mr-2" />
               <span>{new Date().toLocaleDateString('ja-JP')}</span>
             </div>
           </div>
@@ -244,7 +227,7 @@ export default function NewsArchivePage() {
               ) : filteredNews.length === 0 ? (
                 <Card className="bg-[#1c1f26] border border-gray-700 shadow-xl rounded-2xl">
                   <CardContent className="py-12 text-center">
-                    <Bookmark className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                    <BookOpen className="h-12 w-12 text-gray-500 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-300 mb-2">保存されたニュースがありません</h3>
                     <p className="text-gray-400 mb-6">
                       ニュースダッシュボードでニュースを保存して、ここで管理しましょう
@@ -313,7 +296,7 @@ export default function NewsArchivePage() {
                             }}
                             className="text-gray-400 hover:text-amber-400 hover:bg-amber-500/10"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            <Download className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -338,7 +321,7 @@ export default function NewsArchivePage() {
                             className="flex items-center gap-3 hover:bg-sky-50 hover:border-sky-300 rounded-xl py-3 transition-all duration-200"
                             onClick={() => handleLearningStart('deep-dive')}
                           >
-                            <Search className="h-4 w-4" />
+                            <BookOpen className="h-4 w-4" />
                             深掘り
                           </Button>
                           <Button
@@ -354,7 +337,7 @@ export default function NewsArchivePage() {
                             className="flex items-center gap-3 hover:bg-purple-50 hover:border-purple-300 rounded-xl py-3 transition-all duration-200"
                             onClick={() => handleLearningStart('output')}
                           >
-                            <Zap className="h-4 w-4" />
+                            <FileText className="h-4 w-4" />
                             アウトプット
                           </Button>
                         </div>
@@ -373,7 +356,7 @@ export default function NewsArchivePage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-3">
                   <div className="p-2 bg-amber-100 rounded-lg">
-                    <Bookmark className="h-5 w-5 text-amber-600" />
+                    <BookOpen className="h-5 w-5 text-amber-600" />
                   </div>
                   保存統計
                 </CardTitle>
@@ -416,7 +399,7 @@ export default function NewsArchivePage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-3">
                   <div className="p-2 bg-orange-100 rounded-lg">
-                    <Filter className="h-5 w-5 text-orange-600" />
+                    <BookOpen className="h-5 w-5 text-orange-600" />
                   </div>
                   カテゴリー別
                 </CardTitle>

@@ -40,7 +40,7 @@ export default function RootLayout({
                   ダッシュボード
                 </a>
                 <a href="/news-dashboard" className="text-gray-300 hover:text-white transition-colors">
-                  ニュース
+                  ニュースで学ぶ
                 </a>
                 <a href="/news-stock" className="text-gray-300 hover:text-white transition-colors">
                   ニュース保存

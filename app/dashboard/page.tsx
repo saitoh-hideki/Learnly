@@ -29,18 +29,8 @@ export default function DashboardPage() {
     const fetchSavedNewsCount = async () => {
       try {
         setIsLoadingStats(true)
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session) {
-          setIsLoadingStats(false)
-          return
-        }
 
-        const response = await fetch('/api/saved-news', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        })
+        const response = await fetch('/api/saved-news')
 
         if (response.ok) {
           const { savedNews } = await response.json()

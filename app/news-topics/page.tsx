@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Check, Sparkles, ArrowRight, Clock } from 'lucide-react'
+import { ArrowLeft, Check, Sparkles, ArrowRight, Clock, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,80 +15,145 @@ const newsTopics = [
     name: 'ビジネス・経営',
     description: '経営戦略・企業動向',
     icon: '💼',
-    examples: ['DX', 'サステナビリティ'],
-    lastFetchDate: null
+    examples: ['DX', 'サステナビリティ']
   },
   {
     id: 'technology',
     name: 'テクノロジー・IT',
     description: 'AI・Web技術',
     icon: '💻',
-    examples: ['生成AI', 'Web3'],
-    lastFetchDate: null
+    examples: ['生成AI', 'Web3']
   },
   {
     id: 'economics',
     name: '経済・金融',
     description: '金融市場・投資',
     icon: '📊',
-    examples: ['金利政策', 'ESG投資'],
-    lastFetchDate: null
+    examples: ['金利政策', 'ESG投資']
   },
   {
     id: 'science',
     name: '科学・研究',
     description: '研究成果・発見',
     icon: '🔬',
-    examples: ['医療', '宇宙開発'],
-    lastFetchDate: null
+    examples: ['医療', '宇宙開発']
   },
   {
     id: 'education',
     name: '教育・学習',
     description: '学び方・教育改革',
     icon: '📚',
-    examples: ['EdTech', 'STEAM'],
-    lastFetchDate: null
+    examples: ['EdTech', 'STEAM']
   },
   {
     id: 'health',
     name: '健康・医療',
     description: '健康管理・予防医療',
     icon: '🏥',
-    examples: ['メンタルヘルス', '栄養学'],
-    lastFetchDate: null
+    examples: ['メンタルヘルス', '栄養学']
   },
   {
     id: 'environment',
     name: '環境・サステナビリティ',
     description: '気候変動・脱炭素',
     icon: '🌱',
-    examples: ['再エネ', 'プラ削減'],
-    lastFetchDate: null
+    examples: ['再エネ', 'プラ削減']
   },
   {
     id: 'society',
     name: '社会・政治',
     description: '社会課題・政策',
     icon: '🏛️',
-    examples: ['ジェンダー', '国際問題'],
-    lastFetchDate: null
+    examples: ['ジェンダー', '国際問題']
   },
   {
     id: 'lifestyle',
     name: '文化・ライフスタイル',
     description: '生活・価値観',
     icon: '🌟',
-    examples: ['Z世代文化', 'ワークライフバランス'],
-    lastFetchDate: null
+    examples: ['Z世代文化', 'ワークライフバランス']
   }
 ]
+
+// 最新ニュースの型定義
+interface LatestNews {
+  id: string
+  title: string
+  summary: string
+  url: string
+  source: string
+  category: string
+  published_at: string
+  created_at: string
+}
 
 export default function NewsTopicsPage() {
   const router = useRouter()
   const { selectedNewsTopics, setSelectedNewsTopics } = useStore()
   const [selectedTopics, setSelectedTopics] = useState<string[]>(selectedNewsTopics)
   const [isLoading, setIsLoading] = useState(false)
+  const [lastFetchDates, setLastFetchDates] = useState<Record<string, string | null>>({})
+  const [latestNews, setLatestNews] = useState<Record<string, LatestNews>>({})
+
+  // 各カテゴリーの最新取得日と最新ニュースを取得
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const dates: Record<string, string | null> = {}
+        const news: Record<string, LatestNews> = {}
+        
+        // デバッグ用のテストデータ
+        const testNews: Record<string, LatestNews> = {
+          business: {
+            id: '1',
+            title: 'AI会議で企業戦略を自動生成',
+            summary: '経営層の意思決定を効率化する新潮流。AIが会議内容を分析し、戦略提案を自動生成するシステムが注目を集めている。',
+            url: 'https://example.com',
+            source: 'Forbes Japan',
+            category: 'business',
+            published_at: '2025-08-02T10:00:00Z',
+            created_at: '2025-08-02T10:00:00Z'
+          },
+          technology: {
+            id: '2',
+            title: '生成AIによるWeb3開発の革新',
+            summary: 'ブロックチェーン技術とAIを組み合わせた新しい開発手法が登場。開発効率が大幅に向上し、Web3エコシステムの拡大が加速している。',
+            url: 'https://example.com',
+            source: 'TechCrunch',
+            category: 'technology',
+            published_at: '2025-08-02T09:00:00Z',
+            created_at: '2025-08-02T09:00:00Z'
+          },
+          economics: {
+            id: '3',
+            title: 'ESG投資の新潮流と金利政策',
+            summary: '持続可能な投資が主流となり、中央銀行の金利政策も環境配慮を重視する方向に変化。投資家の意思決定に大きな影響を与えている。',
+            url: 'https://example.com',
+            source: 'Bloomberg',
+            category: 'economics',
+            published_at: '2025-08-02T08:00:00Z',
+            created_at: '2025-08-02T08:00:00Z'
+          }
+        }
+        
+        // プロトタイプ用にAPI呼び出しをスキップし、テストデータのみを使用
+        for (const topic of newsTopics) {
+          dates[topic.id] = null
+          // テストデータを使用
+          if (testNews[topic.id]) {
+            news[topic.id] = testNews[topic.id]
+          }
+        }
+        
+        setLastFetchDates(dates)
+        setLatestNews(news)
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   // 最大3つまで選択可能
   const handleTopicToggle = (topicId: string) => {
@@ -112,6 +177,12 @@ export default function NewsTopicsPage() {
     
     // ニュースダッシュボードに遷移
     router.push('/news-dashboard')
+  }
+
+  // ニュース要約を短縮する関数
+  const truncateSummary = (summary: string, maxLength: number = 100) => {
+    if (summary.length <= maxLength) return summary
+    return summary.substring(0, maxLength).trim() + '...'
   }
 
   return (
@@ -171,6 +242,8 @@ export default function NewsTopicsPage() {
           {newsTopics.map((topic) => {
             const isSelected = selectedTopics.includes(topic.id)
             const isDisabled = !isSelected && selectedTopics.length >= 3
+            const lastFetchDate = lastFetchDates[topic.id]
+            const latestNewsItem = latestNews[topic.id]
 
             return (
               <Card
@@ -200,15 +273,30 @@ export default function NewsTopicsPage() {
                     {topic.description}
                   </CardDescription>
                   {/* 最終取得日表示 */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                     <Clock className="h-3 w-3" />
                     <span>
-                      {topic.lastFetchDate 
-                        ? `最終取得: ${new Date(topic.lastFetchDate).toLocaleDateString('ja-JP')}`
+                      {lastFetchDate 
+                        ? `最終取得: ${new Date(lastFetchDate).toLocaleDateString('ja-JP')}`
                         : '未取得'
                       }
                     </span>
                   </div>
+                  
+                  {/* 最新ニュース表示 */}
+                  {latestNewsItem && (
+                    <div className="mt-3">
+                      <div className="text-sm text-gray-400 line-clamp-3 leading-relaxed">
+                        {truncateSummary(latestNewsItem.summary, 120)}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-sky-500 underline">
+                          出典: {latestNewsItem.source}
+                        </span>
+                        <ExternalLink className="h-3 w-3 text-gray-500" />
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-2">

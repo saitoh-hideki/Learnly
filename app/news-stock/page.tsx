@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Download, Calendar, Tag, FileText, ExternalLink, Trash2, Search } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ArrowLeft, Search, Trash2, Download, MessageSquare, BookOpen, FileText, Calendar, Tag, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useStore } from '@/store/useStore'
+import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
 
 interface SavedNews {
@@ -24,48 +23,62 @@ interface SavedNews {
 
 export default function NewsStockPage() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [savedNews, setSavedNews] = useState<SavedNews[]>([])
   const [filteredNews, setFilteredNews] = useState<SavedNews[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+
+  // カテゴリーの定義（ダッシュボードと合わせる）
+  const categories = [
+    { id: 'all', name: 'すべて', icon: '📋' },
+    { id: 'business', name: 'ビジネス・経営', icon: '💼' },
+    { id: 'technology', name: 'テクノロジー・IT', icon: '💻' },
+    { id: 'economics', name: '経済・金融', icon: '📊' },
+    { id: 'science', name: '科学・研究', icon: '🔬' },
+    { id: 'education', name: '教育・学習', icon: '📚' },
+    { id: 'health', name: '健康・医療', icon: '🏥' },
+    { id: 'environment', name: '環境・サステナビリティ', icon: '🌱' },
+    { id: 'society', name: '社会・政治', icon: '🏛️' },
+    { id: 'lifestyle', name: '文化・ライフスタイル', icon: '🌟' }
+  ]
 
   useEffect(() => {
     setMounted(true)
     fetchSavedNews()
   }, [])
 
-  // 検索機能
+  // 検索機能（カテゴリーフィルター + キーワード検索）
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredNews(savedNews)
-    } else {
-      const filtered = savedNews.filter(news => 
+    let filtered = savedNews
+
+    // カテゴリーフィルター
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(news => news.category === selectedCategory)
+    }
+
+    // キーワード検索
+    if (searchQuery.trim() !== '') {
+      filtered = filtered.filter(news => 
         news.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         news.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
         news.source.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        news.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (news.topics && news.topics.some(topic => 
+          topic.toLowerCase().includes(searchQuery.toLowerCase())
+        ))
       )
-      setFilteredNews(filtered)
     }
-  }, [searchQuery, savedNews])
+
+    setFilteredNews(filtered)
+  }, [searchQuery, selectedCategory, savedNews])
 
   // 保存されたニュースを取得
   const fetchSavedNews = async () => {
     try {
       setIsLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        setIsLoading(false)
-        return
-      }
 
-      const response = await fetch('/api/saved-news', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
+      const response = await fetch('/api/saved-news')
 
       if (response.ok) {
         const { savedNews } = await response.json()
@@ -136,10 +149,17 @@ ${news.summary}
               <p className="text-gray-400">保存したニュース記事の管理</p>
             </div>
           </div>
-          <Badge variant="secondary" className="text-lg px-3 py-1 bg-gradient-to-r from-green-500/10 to-emerald-500/10 text-green-400 border-0">
-            <FileText className="h-4 w-4 mr-2" />
-            {filteredNews.length} 件
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-lg px-3 py-1 bg-gradient-to-r from-green-500/10 to-emerald-500/10 text-green-400 border-0">
+              <FileText className="h-4 w-4 mr-2" />
+              {filteredNews.length} 件
+            </Badge>
+            {selectedCategory !== 'all' && (
+              <Badge variant="outline" className="text-sm px-2 py-1 border-green-600 text-green-400 bg-green-500/10">
+                {categories.find(c => c.id === selectedCategory)?.icon} {categories.find(c => c.id === selectedCategory)?.name}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -147,12 +167,33 @@ ${news.summary}
           <div className="relative max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
-              type="text"
-              placeholder="タイトル・要約・出典・カテゴリで検索..."
+              placeholder="タイトル・要約・出典・トピックで検索..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-12 h-12 border-gray-600 bg-[#1c1f26] text-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl shadow-sm"
             />
+          </div>
+        </div>
+
+        {/* Category Filter */}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold text-white mb-4">カテゴリーで絞り込み</h3>
+          <div className="flex flex-wrap gap-3">
+            {categories.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.id ? "default" : "outline"}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`${
+                  selectedCategory === category.id
+                    ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg"
+                    : "border-gray-600 text-gray-300 hover:border-green-400 hover:text-green-400 hover:bg-green-500/10"
+                } rounded-xl px-4 py-2 transition-all duration-200`}
+              >
+                <span className="mr-2">{category.icon}</span>
+                {category.name}
+              </Button>
+            ))}
           </div>
         </div>
 
@@ -222,12 +263,30 @@ ${news.summary}
                     {news.summary}
                   </p>
                   
-                  {news.source && (
-                    <Badge variant="outline" className="text-xs border-gray-600 text-gray-400 mb-2">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {news.source}
-                    </Badge>
-                  )}
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {news.category && (
+                      <Badge variant="outline" className="text-xs border-green-600 text-green-400 bg-green-500/10">
+                        <span className="mr-1">
+                          {categories.find(c => c.id === news.category)?.icon || '📋'}
+                        </span>
+                        {categories.find(c => c.id === news.category)?.name || news.category}
+                      </Badge>
+                    )}
+                    
+                    {news.topics && news.topics.length > 0 && news.topics.map((topic, index) => (
+                      <Badge key={index} variant="outline" className="text-xs border-purple-600 text-purple-400 bg-purple-500/10">
+                        <Tag className="h-3 w-3 mr-1" />
+                        {topic}
+                      </Badge>
+                    ))}
+                    
+                    {news.source && (
+                      <Badge variant="outline" className="text-xs border-gray-600 text-gray-400 bg-gray-500/10">
+                        <Tag className="h-3 w-3 mr-1" />
+                        {news.source}
+                      </Badge>
+                    )}
+                  </div>
 
                   {news.url && (
                     <Button

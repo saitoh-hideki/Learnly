@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, BookOpen, MessageSquare, FileText, Clock, ExternalLink } from 'lucide-react'
+import { ArrowLeft, MessageSquare, FileText, ExternalLink, BookOpen, Search, Zap, Check } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -39,7 +39,7 @@ export default function CategoryPage() {
   const categoryId = params.categoryId as string
   
   const [savedNews, setSavedNews] = useState<SavedNews[]>([])
-  const [selectedArticle, setSelectedArticle] = useState<SavedNews | null>(null)
+  const [selectedNewsIds, setSelectedNewsIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
@@ -53,18 +53,8 @@ export default function CategoryPage() {
   const fetchCategoryNews = async () => {
     try {
       setIsLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        setIsLoading(false)
-        return
-      }
 
-      const response = await fetch('/api/saved-news', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
+      const response = await fetch('/api/saved-news')
 
       if (response.ok) {
         const { savedNews } = await response.json()
@@ -83,13 +73,34 @@ export default function CategoryPage() {
     }
   }
 
-  const handleArticleClick = (article: SavedNews) => {
-    setSelectedArticle(article)
-    // チャットページに遷移し、初期メッセージを設定
-    const initialMessage = `この記事「${article.title}」に関する最新動向について教えてください。記事の内容：${article.summary}`
+  const handleNewsSelect = (newsId: string) => {
+    setSelectedNewsIds(prev => {
+      if (prev.includes(newsId)) {
+        return prev.filter(id => id !== newsId)
+      } else {
+        if (prev.length >= 5) {
+          return prev // 最大5件まで
+        }
+        return [...prev, newsId]
+      }
+    })
+  }
+
+  const handleStartLearning = () => {
+    if (selectedNewsIds.length === 0) return
     
-    // チャットページに遷移（クエリパラメータで初期メッセージを渡す）
-    router.push(`/chat/${categoryId}?initialMessage=${encodeURIComponent(initialMessage)}&articleId=${article.id}`)
+    const selectedArticles = savedNews.filter(news => selectedNewsIds.includes(news.id))
+    const initialPrompt = selectedArticles.map((article, index) =>
+      `【${index + 1}】${article.title}\n${article.summary}`
+    ).join('\n\n')
+    
+    const queryParams = new URLSearchParams({
+      category: categoryId,
+      newsIds: selectedNewsIds.join(','),
+      initialPrompt: initialPrompt
+    })
+    
+    router.push(`/chat/${categoryId}?${queryParams.toString()}`)
   }
 
   if (!mounted) {
@@ -167,11 +178,12 @@ export default function CategoryPage() {
             </p>
             <div className="mt-6">
               <Button
-                onClick={() => router.push(`/chat/${categoryId}`)}
-                className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white rounded-xl shadow-md px-8 py-3 text-lg font-medium"
+                onClick={handleStartLearning}
+                disabled={selectedNewsIds.length === 0}
+                className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white rounded-xl shadow-md px-8 py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <MessageSquare className="h-5 w-5 mr-2" />
-                学習を始める
+                {selectedNewsIds.length > 0 ? `${selectedNewsIds.length}件のニュースで学習を始める` : 'ニュースを選択してください'}
               </Button>
             </div>
           </Card>
@@ -184,9 +196,16 @@ export default function CategoryPage() {
               <BookOpen className="h-5 w-5" />
               ニュース履歴
             </h3>
-            <Badge variant="secondary" className="text-sm">
-              {savedNews.length} 件
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="text-sm">
+                {savedNews.length} 件
+              </Badge>
+              {selectedNewsIds.length > 0 && (
+                <Badge variant="outline" className="text-sm border-green-600 text-green-400 bg-green-500/10">
+                  {selectedNewsIds.length}/5 選択中
+                </Badge>
+              )}
+            </div>
           </div>
 
           {isLoading ? (
@@ -216,15 +235,26 @@ export default function CategoryPage() {
                 {savedNews.slice(0, 10).map((news) => (
                   <Card
                     key={news.id}
-                    className="cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2 border-gray-700 hover:border-sky-400 bg-[#1c1f26] hover:shadow-lg rounded-2xl min-w-[320px] max-w-[320px]"
-                    onClick={() => handleArticleClick(news)}
+                    className={`cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2 ${
+                      selectedNewsIds.includes(news.id)
+                        ? 'border-green-500 bg-green-500/10 shadow-lg'
+                        : 'border-gray-700 hover:border-sky-400 bg-[#1c1f26] hover:shadow-lg'
+                    } rounded-2xl min-w-[320px] max-w-[320px]`}
+                    onClick={() => handleNewsSelect(news.id)}
                   >
                     <CardHeader className="pb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full">
-                          {topicNames[news.category] || news.category}
-                        </Badge>
-                        <span className="text-xs text-gray-400">{news.source}</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full">
+                            {topicNames[news.category] || news.category}
+                          </Badge>
+                          <span className="text-xs text-gray-400">{news.source}</span>
+                        </div>
+                        {selectedNewsIds.includes(news.id) && (
+                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                            <Check className="h-4 w-4 text-white" />
+                          </div>
+                        )}
                       </div>
                       <CardTitle className="text-sm font-semibold text-white line-clamp-2 leading-tight">
                         {news.title}
@@ -236,7 +266,6 @@ export default function CategoryPage() {
                       </CardDescription>
                       <div className="flex items-center justify-between text-xs text-gray-500">
                         <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
                           <span>保存: {new Date(news.created_at).toLocaleDateString('ja-JP')}</span>
                         </div>
                         <Button
