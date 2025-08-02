@@ -39,6 +39,12 @@ export default function RootLayout({
                 <a href="/dashboard" className="text-gray-300 hover:text-white transition-colors">
                   ダッシュボード
                 </a>
+                <a href="/news-dashboard" className="text-gray-300 hover:text-white transition-colors">
+                  ニュース
+                </a>
+                <a href="/news-stock" className="text-gray-300 hover:text-white transition-colors">
+                  ニュース保存
+                </a>
                 <a href="/review-stock" className="text-gray-300 hover:text-white transition-colors">
                   レビュー
                 </a>

@@ -31,85 +31,64 @@ export const learningModes: Mode[] = [
   {
     id: 'business',
     name: 'ビジネス・経営',
-    description: '最新のビジネストレンドや経営戦略について学ぶ',
+    description: '経営戦略・企業動向について学ぶ（DX、サステナビリティなど）',
     icon: '💼',
     popularity: 0
   },
   {
     id: 'technology',
     name: 'テクノロジー・IT',
-    description: 'AI、プログラミング、最新技術トレンドを追う',
+    description: 'AI・Web技術の最新トレンドを追う（生成AI、Web3など）',
     icon: '💻',
-    popularity: 0
-  },
-  {
-    id: 'science',
-    name: '科学・研究',
-    description: '最新の科学的発見や研究成果について深く理解する',
-    icon: '🔬',
     popularity: 0
   },
   {
     id: 'economics',
     name: '経済・金融',
-    description: '経済動向、投資、金融市場の理解を深める',
+    description: '金融市場・投資について理解を深める（金利政策、ESG投資など）',
     icon: '📊',
     popularity: 0
   },
   {
-    id: 'health',
-    name: '健康・医療',
-    description: '健康管理、最新医療情報、ウェルネストレンド',
-    icon: '🏥',
+    id: 'science',
+    name: '科学・研究',
+    description: '研究成果・発見について学ぶ（医療、宇宙開発など）',
+    icon: '🔬',
     popularity: 0
   },
   {
     id: 'education',
     name: '教育・学習',
-    description: '効果的な学習方法、教育改革、スキル開発',
+    description: '学び方・教育改革について理解する（EdTech、STEAMなど）',
     icon: '📚',
     popularity: 0
   },
   {
-    id: 'culture',
-    name: '文化・芸術',
-    description: 'アート、文学、音楽などの文化的トピックス',
-    icon: '🎨',
-    popularity: 0
-  },
-  {
-    id: 'society',
-    name: '社会・政治',
-    description: '社会問題、政治動向、グローバルイシュー',
-    icon: '🏛️',
+    id: 'health',
+    name: '健康・医療',
+    description: '健康管理・予防医療について学ぶ（メンタルヘルス、栄養学など）',
+    icon: '🏥',
     popularity: 0
   },
   {
     id: 'environment',
     name: '環境・サステナビリティ',
-    description: '気候変動、環境保護、持続可能な開発',
+    description: '気候変動・脱炭素について理解する（再エネ、プラ削減など）',
     icon: '🌱',
     popularity: 0
   },
   {
-    id: 'psychology',
-    name: '心理学・自己啓発',
-    description: 'メンタルヘルス、自己成長、人間関係',
-    icon: '🧠',
+    id: 'society',
+    name: '社会・政治',
+    description: '社会課題・政策について学ぶ（ジェンダー、国際問題など）',
+    icon: '🏛️',
     popularity: 0
   },
   {
-    id: 'history',
-    name: '歴史・文明',
-    description: '歴史的出来事、文明の発展、考古学的発見',
-    icon: '📜',
-    popularity: 0
-  },
-  {
-    id: 'sports',
-    name: 'スポーツ・フィットネス',
-    description: 'スポーツニュース、トレーニング、アスリート研究',
-    icon: '⚽',
+    id: 'lifestyle',
+    name: '文化・ライフスタイル',
+    description: '生活・価値観について理解する（Z世代文化、ワークライフバランスなど）',
+    icon: '🌟',
     popularity: 0
   }
 ]

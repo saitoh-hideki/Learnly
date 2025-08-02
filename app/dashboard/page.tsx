@@ -2,22 +2,66 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, TrendingUp, Clock, BookOpen, ArrowRight, Sparkles, Newspaper, BookOpen as BookIcon, Check } from 'lucide-react'
+import { Search, TrendingUp, Clock, BookOpen, ArrowRight, Sparkles, Newspaper, BookOpen as BookIcon, Check, Bookmark } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { mainLearningModes, learningModes } from '@/data/modes'
 import { useStore } from '@/store/useStore'
+import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
-  const { recentModes, setSelectedMode, addRecentMode } = useStore()
+  const { recentModes, recentCategories, setSelectedMode, addRecentMode, addRecentCategory } = useStore()
   const [mounted, setMounted] = useState(false)
+  const [savedNewsCount, setSavedNewsCount] = useState(0)
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [categoryNewsCounts, setCategoryNewsCounts] = useState<{ [key: string]: number }>({})
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // 保存されたニュースの件数を取得
+  useEffect(() => {
+    const fetchSavedNewsCount = async () => {
+      try {
+        setIsLoadingStats(true)
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          setIsLoadingStats(false)
+          return
+        }
+
+        const response = await fetch('/api/saved-news', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        })
+
+        if (response.ok) {
+          const { savedNews } = await response.json()
+          setSavedNewsCount(savedNews?.length || 0)
+          
+          // カテゴリ別のニュース件数を計算
+          const counts: { [key: string]: number } = {}
+          savedNews?.forEach((news: any) => {
+            const category = news.category || 'other'
+            counts[category] = (counts[category] || 0) + 1
+          })
+          setCategoryNewsCounts(counts)
+        }
+      } catch (error) {
+        console.error('Error fetching saved news count:', error)
+      } finally {
+        setIsLoadingStats(false)
+      }
+    }
+
+    fetchSavedNewsCount()
   }, [])
 
   const filteredModes = learningModes.filter(mode =>
@@ -52,6 +96,90 @@ export default function DashboardPage() {
           <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
             AIと共に学びを深め、自らの言葉で振り返る力を育む
           </p>
+        </div>
+
+        {/* Quick Navigation */}
+        <div className="mb-8">
+          <div className="flex justify-center gap-4 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/news-dashboard')}
+              className="border-gray-600 hover:border-sky-400 hover:bg-sky-500/10 text-gray-300 hover:text-sky-400 rounded-xl px-6 py-3"
+            >
+              <Newspaper className="h-5 w-5 mr-2" />
+              ニュース学習
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/news-stock')}
+              className="border-gray-600 hover:border-amber-400 hover:bg-amber-500/10 text-gray-300 hover:text-amber-400 rounded-xl px-6 py-3 relative"
+            >
+              <BookOpen className="h-5 w-5 mr-2" />
+              ニュースストック
+              {savedNewsCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full">
+                  {savedNewsCount}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/review-stock')}
+              className="border-gray-600 hover:border-indigo-400 hover:bg-indigo-500/10 text-gray-300 hover:text-indigo-400 rounded-xl px-6 py-3"
+            >
+              <Check className="h-5 w-5 mr-2" />
+              学習履歴
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <Card className="bg-[#1c1f26] border border-gray-700 rounded-2xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">保存されたニュース</p>
+                    <p className="text-2xl font-bold text-white">
+                      {isLoadingStats ? '...' : savedNewsCount}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-500/10 rounded-xl">
+                    <Bookmark className="h-6 w-6 text-amber-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-[#1c1f26] border border-gray-700 rounded-2xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">学習モード</p>
+                    <p className="text-2xl font-bold text-white">{learningModes.length}</p>
+                  </div>
+                  <div className="p-3 bg-indigo-500/10 rounded-xl">
+                    <BookIcon className="h-6 w-6 text-indigo-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-[#1c1f26] border border-gray-700 rounded-2xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-1">最近使用</p>
+                    <p className="text-2xl font-bold text-white">{recentModes.length}</p>
+                  </div>
+                  <div className="p-3 bg-sky-500/10 rounded-xl">
+                    <Clock className="h-6 w-6 text-sky-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Main Learning Modes */}
@@ -122,7 +250,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Theme Learning Modes */}
+        {/* Theme Learning Modes - 3x3 Grid */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-semibold text-white">
@@ -140,34 +268,63 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredModes.map((mode, index) => (
-              <Card
-                key={mode.id}
-                className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] border border-gray-700 bg-[#1c1f26] hover:shadow-lg rounded-2xl h-full"
-                onClick={() => handleModeSelect(mode)}
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="text-4xl mb-2">{mode.icon}</div>
-                  </div>
-                  <CardTitle className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">
-                    {mode.name}
-                  </CardTitle>
-                  <CardDescription className="text-sm text-gray-400 leading-relaxed">
-                    {mode.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <BookOpen className="h-3 w-3" />
-                      <span>学習可能</span>
+          {/* 3x3 Grid Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {filteredModes.slice(0, 9).map((mode, index) => {
+              const newsCount = categoryNewsCounts[mode.id] || 0
+              const isRecent = recentCategories.includes(mode.id)
+              
+              return (
+                <Card
+                  key={mode.id}
+                  className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] border border-gray-700 bg-[#1c1f26] hover:shadow-lg rounded-2xl h-full relative"
+                  onClick={() => {
+                    addRecentCategory(mode.id)
+                    router.push(`/category/${mode.id}`)
+                  }}
+                >
+                  {/* 最近使用バッジ */}
+                  {isRecent && (
+                    <div className="absolute -top-2 -right-2 z-10">
+                      <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
+                        最近使用
+                      </Badge>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  )}
+                  
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="text-4xl mb-2">{mode.icon}</div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant="secondary" className="text-xs bg-indigo-500/10 text-indigo-400 border-0">
+                          学習可能
+                        </Badge>
+                        {newsCount > 0 && (
+                          <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
+                            ニュース{newsCount}件
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <CardTitle className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">
+                      {mode.name}
+                    </CardTitle>
+                    <CardDescription className="text-sm text-gray-400 leading-relaxed">
+                      {mode.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <BookOpen className="h-3 w-3" />
+                        <span>詳細を見る</span>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-indigo-400 transition-colors" />
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
 

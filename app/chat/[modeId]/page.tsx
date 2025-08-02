@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Send, BookOpen, Sparkles, Newspaper, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ type Message = {
 
 export default function ChatPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const modeId = params.modeId as string
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
@@ -28,6 +29,7 @@ export default function ChatPage() {
   const [news, setNews] = useState<any[]>([])
   const [showReview, setShowReview] = useState(false)
   const [review, setReview] = useState<any>(null)
+  const [hasInitialized, setHasInitialized] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { currentSession, createSession, addMessage, saveReview } = useStore()
 
@@ -43,6 +45,73 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // クエリパラメータから初期メッセージを取得して自動送信
+  useEffect(() => {
+    const initialMessage = searchParams.get('initialMessage')
+    const articleId = searchParams.get('articleId')
+    
+    if (initialMessage && !hasInitialized && currentSession) {
+      setHasInitialized(true)
+      // 初期メッセージを自動送信
+      setTimeout(() => {
+        handleInitialMessage(initialMessage, articleId)
+      }, 1000) // 1秒後に自動送信
+    }
+  }, [searchParams, hasInitialized, currentSession])
+
+  const handleInitialMessage = async (message: string, articleId?: string | null) => {
+    const userMessage: Message = {
+      role: 'user',
+      content: message,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setIsLoading(true)
+
+    if (currentSession) {
+      addMessage(currentSession.id, {
+        role: userMessage.role,
+        content: userMessage.content
+      })
+    }
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [userMessage],
+          mode,
+          articleId
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to send message')
+
+      const data = await response.json()
+      
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+
+      if (currentSession) {
+        addMessage(currentSession.id, {
+          role: assistantMessage.role,
+          content: assistantMessage.content
+        })
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const fetchNews = async () => {
     if (!mode) return

@@ -2,69 +2,85 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Check, Sparkles, ArrowRight } from 'lucide-react'
+import { ArrowLeft, Check, Sparkles, ArrowRight, Clock } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useStore } from '@/store/useStore'
 
-// ニューステーマの定義
+// ニューステーマの定義（9カテゴリ）
 const newsTopics = [
   {
     id: 'business',
     name: 'ビジネス・経営',
-    description: '最新のビジネストレンド、経営戦略、企業動向',
+    description: '経営戦略・企業動向',
     icon: '💼',
-    examples: ['DX推進', 'サステナビリティ', 'リモートワーク']
+    examples: ['DX', 'サステナビリティ'],
+    lastFetchDate: null
   },
   {
     id: 'technology',
     name: 'テクノロジー・IT',
-    description: 'AI、プログラミング、最新技術トレンド',
+    description: 'AI・Web技術',
     icon: '💻',
-    examples: ['生成AI', 'Web3', '量子コンピュータ']
+    examples: ['生成AI', 'Web3'],
+    lastFetchDate: null
   },
   {
     id: 'economics',
     name: '経済・金融',
-    description: '経済動向、投資、金融市場の最新情報',
+    description: '金融市場・投資',
     icon: '📊',
-    examples: ['金利政策', '暗号資産', 'ESG投資']
+    examples: ['金利政策', 'ESG投資'],
+    lastFetchDate: null
   },
   {
     id: 'science',
     name: '科学・研究',
-    description: '最新の科学的発見や研究成果',
+    description: '研究成果・発見',
     icon: '🔬',
-    examples: ['医学研究', '気候変動', '宇宙開発']
+    examples: ['医療', '宇宙開発'],
+    lastFetchDate: null
   },
   {
     id: 'education',
     name: '教育・学習',
-    description: '教育改革、学習手法、スキル開発',
+    description: '学び方・教育改革',
     icon: '📚',
-    examples: ['EdTech', '生涯学習', 'STEAM教育']
+    examples: ['EdTech', 'STEAM'],
+    lastFetchDate: null
   },
   {
     id: 'health',
     name: '健康・医療',
-    description: '健康管理、最新医療情報、ウェルネス',
+    description: '健康管理・予防医療',
     icon: '🏥',
-    examples: ['予防医療', 'メンタルヘルス', '栄養学']
+    examples: ['メンタルヘルス', '栄養学'],
+    lastFetchDate: null
   },
   {
     id: 'environment',
     name: '環境・サステナビリティ',
-    description: '気候変動、環境保護、持続可能な開発',
+    description: '気候変動・脱炭素',
     icon: '🌱',
-    examples: ['再生可能エネルギー', '循環経済', '生物多様性']
+    examples: ['再エネ', 'プラ削減'],
+    lastFetchDate: null
   },
   {
     id: 'society',
     name: '社会・政治',
-    description: '社会問題、政治動向、グローバルイシュー',
+    description: '社会課題・政策',
     icon: '🏛️',
-    examples: ['少子化対策', '移民政策', '国際関係']
+    examples: ['ジェンダー', '国際問題'],
+    lastFetchDate: null
+  },
+  {
+    id: 'lifestyle',
+    name: '文化・ライフスタイル',
+    description: '生活・価値観',
+    icon: '🌟',
+    examples: ['Z世代文化', 'ワークライフバランス'],
+    lastFetchDate: null
   }
 ]
 
@@ -150,8 +166,8 @@ export default function NewsTopicsPage() {
           </Card>
         </div>
 
-        {/* Topics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Topics Grid - 3x3 Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 max-w-6xl mx-auto">
           {newsTopics.map((topic) => {
             const isSelected = selectedTopics.includes(topic.id)
             const isDisabled = !isSelected && selectedTopics.length >= 3
@@ -172,7 +188,7 @@ export default function NewsTopicsPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="text-4xl">{topic.icon}</div>
                     {isSelected && (
-                      <div className="p-2 bg-sky-500 rounded-full">
+                      <div className="p-2 bg-sky-500 rounded-full shadow-lg">
                         <Check className="h-4 w-4 text-white" />
                       </div>
                     )}
@@ -180,9 +196,19 @@ export default function NewsTopicsPage() {
                   <CardTitle className="text-lg font-semibold text-white mb-2">
                     {topic.name}
                   </CardTitle>
-                  <CardDescription className="text-gray-400 text-sm leading-relaxed">
+                  <CardDescription className="text-gray-400 text-sm leading-relaxed mb-3">
                     {topic.description}
                   </CardDescription>
+                  {/* 最終取得日表示 */}
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Clock className="h-3 w-3" />
+                    <span>
+                      {topic.lastFetchDate 
+                        ? `最終取得: ${new Date(topic.lastFetchDate).toLocaleDateString('ja-JP')}`
+                        : '未取得'
+                      }
+                    </span>
+                  </div>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-2">

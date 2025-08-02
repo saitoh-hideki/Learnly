@@ -65,6 +65,7 @@ interface AppState {
   selectedMode: Mode | null
   recentModes: Mode[]
   selectedNewsTopics: string[]
+  recentCategories: string[] // 最近使用したカテゴリ
   
   // Chat sessions
   currentSession: ChatSession | null
@@ -81,6 +82,7 @@ interface AppState {
   setSelectedMode: (mode: Mode) => void
   addRecentMode: (mode: Mode) => void
   setSelectedNewsTopics: (topics: string[]) => void
+  addRecentCategory: (categoryId: string) => void
   createSession: (modeId: string) => ChatSession
   addMessage: (sessionId: string, message: { role: 'user' | 'assistant'; content: string }) => void
   saveReview: (review: Omit<Review, 'id' | 'createdAt'>) => void
@@ -100,6 +102,7 @@ export const useStore = create<AppState>()(
       selectedMode: null,
       recentModes: [],
       selectedNewsTopics: [],
+      recentCategories: [],
       currentSession: null,
       sessions: [],
       reviews: [],
@@ -134,6 +137,16 @@ export const useStore = create<AppState>()(
       })),
       
       setSelectedNewsTopics: (topics) => set({ selectedNewsTopics: topics }),
+      
+      addRecentCategory: (categoryId) => set((state) => {
+        const updatedCategories = [
+          categoryId,
+          ...state.recentCategories.filter(id => id !== categoryId)
+        ].slice(0, 5)
+        return {
+          recentCategories: updatedCategories
+        }
+      }),
       
       createSession: (modeId) => {
         const newSession: ChatSession = {
@@ -305,6 +318,7 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         recentModes: state.recentModes,
         selectedNewsTopics: state.selectedNewsTopics,
+        recentCategories: state.recentCategories,
         sessions: state.sessions,
         reviews: state.reviews,
         newsArticles: state.newsArticles,
