@@ -6,7 +6,9 @@ import { ArrowLeft, Check, Sparkles, ArrowRight, Clock, ExternalLink } from 'luc
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Header } from '@/components/ui/header'
 import { useStore } from '@/store/useStore'
+import { useLabels } from '@/lib/kidsLabels'
 
 // ニューステーマの定義（9カテゴリ）
 const newsTopics = [
@@ -89,7 +91,8 @@ interface LatestNews {
 
 export default function NewsTopicsPage() {
   const router = useRouter()
-  const { selectedNewsTopics, setSelectedNewsTopics } = useStore()
+  const { selectedNewsTopics, setSelectedNewsTopics, isKidsMode } = useStore()
+  const labels = useLabels(isKidsMode)
   const [selectedTopics, setSelectedTopics] = useState<string[]>(selectedNewsTopics)
   const [isLoading, setIsLoading] = useState(false)
   const [lastFetchDates, setLastFetchDates] = useState<Record<string, string | null>>({})
@@ -99,71 +102,30 @@ export default function NewsTopicsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const dates: Record<string, string | null> = {}
-        const news: Record<string, LatestNews> = {}
-        
-        // デバッグ用のテストデータ
-        const testNews: Record<string, LatestNews> = {
-          business: {
-            id: '1',
-            title: 'AI会議で企業戦略を自動生成',
-            summary: '経営層の意思決定を効率化する新潮流。AIが会議内容を分析し、戦略提案を自動生成するシステムが注目を集めている。',
-            url: 'https://example.com',
-            source: 'Forbes Japan',
-            category: 'business',
-            published_at: '2025-08-02T10:00:00Z',
-            created_at: '2025-08-02T10:00:00Z'
-          },
-          technology: {
-            id: '2',
-            title: '生成AIによるWeb3開発の革新',
-            summary: 'ブロックチェーン技術とAIを組み合わせた新しい開発手法が登場。開発効率が大幅に向上し、Web3エコシステムの拡大が加速している。',
-            url: 'https://example.com',
-            source: 'TechCrunch',
-            category: 'technology',
-            published_at: '2025-08-02T09:00:00Z',
-            created_at: '2025-08-02T09:00:00Z'
-          },
-          economics: {
-            id: '3',
-            title: 'ESG投資の新潮流と金利政策',
-            summary: '持続可能な投資が主流となり、中央銀行の金利政策も環境配慮を重視する方向に変化。投資家の意思決定に大きな影響を与えている。',
-            url: 'https://example.com',
-            source: 'Bloomberg',
-            category: 'economics',
-            published_at: '2025-08-02T08:00:00Z',
-            created_at: '2025-08-02T08:00:00Z'
-          }
+        const response = await fetch('/api/latest-news')
+        if (response.ok) {
+          const data = await response.json()
+          setLastFetchDates(data.lastFetchDates || {})
+          setLatestNews(data.latestNews || {})
         }
-        
-        // プロトタイプ用にAPI呼び出しをスキップし、テストデータのみを使用
-        for (const topic of newsTopics) {
-          dates[topic.id] = null
-          // テストデータを使用
-          if (testNews[topic.id]) {
-            news[topic.id] = testNews[topic.id]
-          }
-        }
-        
-        setLastFetchDates(dates)
-        setLatestNews(news)
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('Error fetching latest news data:', error)
       }
     }
 
     fetchData()
   }, [])
 
-  // 最大3つまで選択可能
   const handleTopicToggle = (topicId: string) => {
     setSelectedTopics(prev => {
       if (prev.includes(topicId)) {
         return prev.filter(id => id !== topicId)
-      } else if (prev.length < 3) {
+      } else {
+        if (prev.length >= 3) {
+          return prev
+        }
         return [...prev, topicId]
       }
-      return prev
     })
   }
 
@@ -171,155 +133,166 @@ export default function NewsTopicsPage() {
     if (selectedTopics.length === 0) return
 
     setIsLoading(true)
-    
-    // 選択されたテーマをZustand storeに保存
     setSelectedNewsTopics(selectedTopics)
-    
-    // ニュースダッシュボードに遷移
-    router.push('/news-dashboard')
+
+    try {
+      // 選択されたトピックのニュースを取得
+      const response = await fetch('/api/latest-news', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ topics: selectedTopics }),
+      })
+
+      if (response.ok) {
+        router.push('/news-dashboard')
+      }
+    } catch (error) {
+      console.error('Error fetching news:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // ニュース要約を短縮する関数
   const truncateSummary = (summary: string, maxLength: number = 100) => {
     if (summary.length <= maxLength) return summary
-    return summary.substring(0, maxLength).trim() + '...'
+    return summary.substring(0, maxLength) + '...'
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('ja-JP', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   return (
     <div className="min-h-screen bg-[#0e1a2a] relative overflow-hidden">
-      {/* Enhanced Background decorative elements */}
+      <Header title={labels.newsTopics} />
+      
+      {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-sky-500/8 to-transparent"></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-t from-blue-600/5 to-transparent rounded-full blur-3xl"></div>
         <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-br from-indigo-500/3 to-purple-500/3 rounded-full blur-3xl"></div>
-        <div className="absolute top-2/3 right-1/3 w-48 h-48 bg-gradient-to-bl from-emerald-500/2 to-teal-500/2 rounded-full blur-2xl"></div>
       </div>
 
       <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push('/dashboard')}
-              className="hover:bg-slate-800/50 rounded-xl text-slate-300 hover:text-cyan-200 transition-all"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl shadow-lg">
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">ニューステーマを選択</h1>
-                <p className="text-slate-400">学習したい分野を最大3つ選んでください</p>
-              </div>
-            </div>
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="text-slate-300 hover:text-white mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            {isKidsMode ? "もどる" : "戻る"}
+          </Button>
+          
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-white mb-4 flex items-center justify-center gap-3">
+              <Sparkles className="h-8 w-8 text-blue-400" />
+              {labels.newsTopics}
+            </h1>
+            <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
+              {labels.newsTopicsSubtitle}
+            </p>
           </div>
         </div>
 
         {/* Selection Info */}
-        <div className="mb-8">
-          <Card className="bg-[#1c1f26] border border-slate-700/50 rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">選択状況</h3>
-                  <p className="text-slate-400 text-sm">
-                    {selectedTopics.length}/3 のテーマを選択中
-                  </p>
-                </div>
-                <Badge 
-                  variant="secondary" 
-                  className={`text-sm px-3 py-1 ${
-                    selectedTopics.length === 3 
-                      ? 'bg-gradient-to-r from-slate-200 to-cyan-200 text-slate-800 border-0' 
-                      : 'bg-gradient-to-r from-sky-400 to-cyan-300 text-black border-0'
-                  }`}
-                >
-                  {selectedTopics.length === 3 ? '最大数選択済み' : '選択可能'}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-2 bg-slate-800/50 border border-slate-600 rounded-full px-6 py-3">
+            <Check className="h-5 w-5 text-green-400" />
+            <span className="text-white">
+              {isKidsMode 
+                ? `${selectedTopics.length}/3 の テーマを えらんだよ` 
+                : `${selectedTopics.length}/3 のテーマを選択中`
+              }
+            </span>
+          </div>
         </div>
 
-        {/* Topics Grid - 3x3 Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 max-w-6xl mx-auto">
+        {/* Topics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {newsTopics.map((topic) => {
             const isSelected = selectedTopics.includes(topic.id)
-            const isDisabled = !isSelected && selectedTopics.length >= 3
-            const lastFetchDate = lastFetchDates[topic.id]
             const latestNewsItem = latestNews[topic.id]
-
+            const lastFetchDate = lastFetchDates[topic.id]
+            
             return (
               <Card
                 key={topic.id}
-                className={`cursor-pointer transition-all duration-300 border-2 ${
-                  isSelected
-                    ? 'border-cyan-400 bg-gradient-to-r from-sky-400/10 to-cyan-300/10 shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:ring-1 hover:ring-cyan-500/30'
-                    : isDisabled
-                    ? 'border-slate-700/50 bg-[#1c1f26] opacity-50'
-                    : 'border-slate-700/50 bg-[#1c1f26] hover:border-cyan-400/50 hover:shadow-md hover:ring-1 hover:ring-cyan-500/30'
-                } rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]`}
-                onClick={() => !isDisabled && handleTopicToggle(topic.id)}
+                className={`cursor-pointer transition-all duration-300 hover:scale-105 ${
+                  isSelected 
+                    ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20' 
+                    : 'bg-slate-800/50 border-slate-600 hover:border-slate-500'
+                }`}
+                onClick={() => handleTopicToggle(topic.id)}
               >
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="text-4xl">{topic.icon}</div>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{topic.icon}</span>
+                      <div>
+                        <CardTitle className="text-white text-lg">
+                          {isKidsMode 
+                            ? labels.categories[topic.id as keyof typeof labels.categories] || topic.name
+                            : topic.name
+                          }
+                        </CardTitle>
+                        <CardDescription className="text-slate-400">
+                          {topic.description}
+                        </CardDescription>
+                      </div>
+                    </div>
                     {isSelected && (
-                      <div className="p-2 bg-gradient-to-r from-sky-400 to-cyan-300 rounded-full shadow-lg">
-                        <Check className="h-4 w-4 text-black" />
+                      <div className="p-2 bg-blue-500 rounded-full">
+                        <Check className="h-4 w-4 text-white" />
                       </div>
                     )}
                   </div>
-                  <CardTitle className="text-lg font-semibold text-white mb-2">
-                    {topic.name}
-                  </CardTitle>
-                  <CardDescription className="text-slate-400 text-sm leading-relaxed mb-3">
-                    {topic.description}
-                  </CardDescription>
-                  {/* 最終取得日表示 */}
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
-                    <Clock className="h-3 w-3" />
-                    <span>
-                      {lastFetchDate 
-                        ? `最終取得: ${new Date(lastFetchDate).toLocaleDateString('ja-JP')}`
-                        : '未取得'
-                      }
-                    </span>
-                  </div>
-                  
-                  {/* 最新ニュース表示 */}
-                  {latestNewsItem && (
-                    <div className="mt-3">
-                      <div className="text-sm text-slate-400 line-clamp-3 leading-relaxed">
-                        {truncateSummary(latestNewsItem.summary, 120)}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-cyan-300 underline">
-                          出典: {latestNewsItem.source}
-                        </span>
-                        <ExternalLink className="h-3 w-3 text-slate-500" />
-                      </div>
-                    </div>
-                  )}
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-500 font-medium">例：</p>
-                    <div className="flex flex-wrap gap-1">
-                      {topic.examples.map((example, index) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="text-xs border-slate-600/50 text-slate-400"
-                        >
-                          {example}
-                        </Badge>
-                      ))}
+                
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* Examples */}
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">
+                        {isKidsMode ? "りれい" : "例"}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {topic.examples.map((example, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs bg-slate-700/50 text-slate-300">
+                            {example}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
+
+                    {/* Latest News Preview */}
+                    {latestNewsItem && (
+                      <div className="border-t border-slate-600/50 pt-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="h-3 w-3 text-slate-500" />
+                          <span className="text-xs text-slate-500">
+                            {isKidsMode ? "さいきんの ニュース" : "最新ニュース"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-300 line-clamp-2">
+                          {truncateSummary(latestNewsItem.title, 60)}
+                        </p>
+                        {lastFetchDate && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            {isKidsMode ? "さいきんの こうしん" : "最終更新"}: {formatDate(lastFetchDate)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -328,30 +301,30 @@ export default function NewsTopicsPage() {
         </div>
 
         {/* Continue Button */}
-        <div className="flex justify-center">
+        <div className="text-center">
           <Button
             onClick={handleContinue}
             disabled={selectedTopics.length === 0 || isLoading}
-            className="bg-gradient-to-r from-sky-400 to-cyan-300 hover:scale-[1.02] text-black rounded-xl shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:shadow-[0_15px_40px_rgba(56,189,248,0.3)] px-8 py-3 text-lg font-medium transition-all"
+            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-8 py-3 rounded-xl text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105"
           >
             {isLoading ? (
-              '設定中...'
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                {isKidsMode ? "ニュースを よみこみちゅう..." : "ニュースを読み込み中..."}
+              </div>
             ) : (
-              <>
-                ニュース学習を始める
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </>
+              <div className="flex items-center gap-2">
+                {isKidsMode ? "べんきょうを スタート！" : "学習を始める"}
+                <ArrowRight className="h-5 w-5" />
+              </div>
             )}
           </Button>
-        </div>
-
-        {/* Help Text */}
-        <div className="mt-8 text-center">
-          <p className="text-slate-400 text-sm">
-            選択したテーマに基づいて、毎日最新のニュースを取得します。
-            <br />
-            後から設定画面から変更することも可能です。
-          </p>
+          
+          {selectedTopics.length === 0 && (
+            <p className="text-slate-400 mt-4">
+              {isKidsMode ? "きょうみのある テーマを えらんでね" : "興味のあるテーマを選択してください"}
+            </p>
+          )}
         </div>
       </div>
     </div>

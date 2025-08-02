@@ -7,14 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Header } from '@/components/ui/header'
 import { mainLearningModes, learningModes } from '@/data/modes'
 import { useStore } from '@/store/useStore'
+import { useLabels } from '@/lib/kidsLabels'
 import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
-  const { recentModes, recentCategories, setSelectedMode, addRecentMode, addRecentCategory } = useStore()
+  const { recentModes, recentCategories, setSelectedMode, addRecentMode, addRecentCategory, isKidsMode } = useStore()
+  const labels = useLabels(isKidsMode)
   const [mounted, setMounted] = useState(false)
   const [savedNewsCount, setSavedNewsCount] = useState(0)
   const [isLoadingStats, setIsLoadingStats] = useState(true)
@@ -81,6 +84,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0e1a2a] relative overflow-hidden">
+      <Header title={labels.dashboardTitle} />
+      
       {/* Enhanced Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-sky-500/8 to-transparent"></div>
@@ -93,258 +98,222 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
-            学習モードを選択
+            {labels.dashboardTitle}
           </h2>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            AIと共に学びを深め、自らの言葉で振り返る力を育む
+            {labels.dashboardSubtitle}
           </p>
         </div>
 
-        {/* Quick Navigation */}
-        <div className="mb-8">
-          <div className="flex justify-center gap-4 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={() => router.push('/news-dashboard')}
-              className="border-slate-600/50 hover:border-cyan-400/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-200 rounded-xl px-6 py-3 transition-all"
-            >
-              <Newspaper className="h-5 w-5 mr-2" />
-              ニュース学習
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/news-stock')}
-              className="border-slate-600/50 hover:border-cyan-400/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-200 rounded-xl px-6 py-3 relative transition-all"
-            >
-              <BookOpen className="h-5 w-5 mr-2" />
-              ニュースストック
-              {savedNewsCount > 0 && (
-                <Badge className="absolute -top-2 -right-2 bg-gradient-to-r from-sky-400 to-cyan-300 text-black text-xs px-2 py-1 rounded-full shadow-lg">
-                  {savedNewsCount}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/review-stock')}
-              className="border-slate-600/50 hover:border-cyan-400/50 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-200 rounded-xl px-6 py-3 transition-all"
-            >
-              <Check className="h-5 w-5 mr-2" />
-              学習履歴
-            </Button>
+        {/* Search Bar */}
+        <div className="mb-8 max-w-md mx-auto">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <Input
+              type="text"
+              placeholder={isKidsMode ? "べんきょうしたい ことを さがそう" : "学習したい内容を検索"}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500"
+            />
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <Card className="bg-[#1c1f26] border border-slate-700/50 rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-400 mb-1">保存されたニュース</p>
-                    <p className="text-2xl font-bold text-white">
-                      {isLoadingStats ? '...' : savedNewsCount}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-slate-200 to-cyan-200 rounded-xl">
-                    <Bookmark className="h-6 w-6 text-slate-800" />
-                  </div>
+        {/* Quick Stats */}
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-slate-800/50 border-slate-600">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">
+                    {isKidsMode ? "とっておいた ニュース" : "保存済みニュース"}
+                  </p>
+                  <p className="text-2xl font-bold text-white">
+                    {isLoadingStats ? '...' : savedNewsCount}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-[#1c1f26] border border-slate-700/50 rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-400 mb-1">学習モード</p>
-                    <p className="text-2xl font-bold text-white">{learningModes.length}</p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-slate-300 to-cyan-200 rounded-xl">
-                    <BookIcon className="h-6 w-6 text-slate-800" />
-                  </div>
+                <Bookmark className="h-8 w-8 text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-600">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">
+                    {isKidsMode ? "さいきんの べんきょう" : "最近の学習"}
+                  </p>
+                  <p className="text-2xl font-bold text-white">
+                    {recentModes.length}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-[#1c1f26] border border-slate-700/50 rounded-2xl shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-400 mb-1">最近使用</p>
-                    <p className="text-2xl font-bold text-white">{recentModes.length}</p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-cyan-200 to-sky-300 rounded-xl">
-                    <Clock className="h-6 w-6 text-slate-800" />
-                  </div>
+                <Clock className="h-8 w-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-600">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-slate-400 text-sm">
+                    {isKidsMode ? "きょうみのある カテゴリ" : "興味のあるカテゴリ"}
+                  </p>
+                  <p className="text-2xl font-bold text-white">
+                    {recentCategories.length}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <TrendingUp className="h-8 w-8 text-purple-400" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Learning Modes */}
-        <div className="mb-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-            {mainLearningModes.map((mode, index) => (
+        <div className="mb-12">
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-blue-400" />
+            {isKidsMode ? "メインの べんきょうモード" : "メインの学習モード"}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {mainLearningModes.map((mode) => (
               <Card
                 key={mode.id}
-                className="flex flex-col justify-between bg-[#1c1f26] border border-slate-700/50 rounded-3xl p-8 min-h-[460px] shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 cursor-pointer group hover:ring-1 hover:ring-cyan-500/30 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]"
-                onClick={(e) => {
-                  console.log('Card clicked for mode:', mode)
-                  handleModeSelect(mode)
-                }}
+                className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group"
+                onClick={() => handleModeSelect(mode)}
               >
-                <div>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className={`p-3 rounded-2xl ${
-                      index === 0 ? 'bg-gradient-to-r from-slate-200 to-cyan-200' : 'bg-gradient-to-r from-slate-300 to-cyan-200'
-                    }`}>
-                      <div className={index === 0 ? 'text-slate-800' : 'text-slate-800'}>
-                        {index === 0 ? <Newspaper className="h-8 w-8" /> : <BookIcon className="h-8 w-8" />}
-                      </div>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-blue-400" />
                     </div>
-                    <h2 className="text-xl font-semibold text-white">{mode.name}</h2>
+                    <div>
+                      <CardTitle className="text-white text-lg">
+                        {mode.name}
+                      </CardTitle>
+                      <CardDescription className="text-slate-400">
+                        {mode.description}
+                      </CardDescription>
+                    </div>
                   </div>
-                  <p className="text-slate-400 text-base leading-relaxed mb-6">
-                    {mode.description}
-                  </p>
-                  <ul className="text-sm text-slate-400 leading-relaxed space-y-3 mb-6 list-none">
-                    {mode.features?.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-start gap-3">
-                        <Check className={`mt-[2px] text-cyan-300`} size={16} />
-                        <span>{feature.replace('✅ ', '')}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <Button 
-                  className="mt-auto w-full bg-gradient-to-r from-sky-400 to-cyan-300 text-black text-base font-medium rounded-xl hover:scale-[1.02] transition-all shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:shadow-[0_15px_40px_rgba(56,189,248,0.3)]"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    console.log('Button clicked for mode:', mode)
-                    handleModeSelect(mode)
-                  }}
-                >
-                  学習を始める <ArrowRight className="ml-2" size={18} />
-                </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
+                      {isKidsMode ? "おすすめ" : "おすすめ"}
+                    </Badge>
+                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>
         </div>
 
-        {/* Recent Modes */}
+        {/* All Learning Modes */}
+        <div className="mb-12">
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+            <BookIcon className="h-5 w-5 text-green-400" />
+            {isKidsMode ? "すべての べんきょうモード" : "すべての学習モード"}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredModes.map((mode) => (
+              <Card
+                key={mode.id}
+                className="bg-slate-800/50 border-slate-600 hover:border-green-500 transition-all duration-300 cursor-pointer group"
+                onClick={() => handleModeSelect(mode)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-500/20 rounded-lg">
+                      <BookOpen className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-base">
+                        {mode.name}
+                      </CardTitle>
+                      <CardDescription className="text-slate-400 text-sm">
+                        {mode.description}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="bg-green-500/20 text-green-300">
+                      {isKidsMode ? "べんきょう" : "学習"}
+                    </Badge>
+                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-green-400 transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Learning */}
         {recentModes.length > 0 && (
           <div className="mb-12">
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-3 text-white">
-              <div className="p-2 bg-gradient-to-r from-slate-200 to-cyan-200 rounded-lg">
-                <Clock className="h-5 w-5 text-slate-800" />
-              </div>
-              最近使用したモード
-            </h2>
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {recentModes.map((mode) => (
-                <Button
+            <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-yellow-400" />
+              {isKidsMode ? "さいきんの べんきょう" : "最近の学習"}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentModes.slice(0, 6).map((mode) => (
+                <Card
                   key={mode.id}
-                  variant="outline"
+                  className="bg-slate-800/50 border-slate-600 hover:border-yellow-500 transition-all duration-300 cursor-pointer group"
                   onClick={() => handleModeSelect(mode)}
-                  className="flex items-center gap-3 min-w-fit border border-slate-600/50 hover:border-cyan-400/50 hover:bg-cyan-500/10 transition-all rounded-xl px-6 py-3 text-slate-300 hover:text-cyan-200"
                 >
-                  <span className="text-2xl">{mode.icon}</span>
-                  <span className="font-medium">{mode.name}</span>
-                </Button>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-yellow-500/20 rounded-lg">
+                        <Check className="h-5 w-5 text-yellow-400" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-white text-base">
+                          {mode.name}
+                        </CardTitle>
+                        <CardDescription className="text-slate-400 text-sm">
+                          {mode.description}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300">
+                        {isKidsMode ? "さいきん" : "最近"}
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-yellow-400 transition-colors" />
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
         )}
 
-        {/* Theme Learning Modes - 3x3 Grid */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-semibold text-white">
-              テーマ別学習
-            </h2>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-              <Input
-                type="text"
-                placeholder="キーワードで探す"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 w-80 border-slate-600/50 bg-[#1c1f26] text-slate-300 focus:border-cyan-500 focus:ring-cyan-500 rounded-full shadow-inner"
-              />
-            </div>
-          </div>
-          
-          {/* 3x3 Grid Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {filteredModes.slice(0, 9).map((mode, index) => {
-              const newsCount = categoryNewsCounts[mode.id] || 0
-              const isRecent = recentCategories.includes(mode.id)
-              
-              return (
-                <Card
-                  key={mode.id}
-                  className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] border border-slate-700/50 bg-[#1c1f26] hover:shadow-lg rounded-2xl h-full relative hover:ring-1 hover:ring-cyan-500/30 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]"
-                  onClick={() => {
-                    addRecentCategory(mode.id)
-                    router.push(`/category/${mode.id}`)
-                  }}
-                >
-                  {/* 最近使用バッジ */}
-                  {isRecent && (
-                    <div className="absolute -top-2 -right-2 z-10">
-                      <Badge className="bg-gradient-to-r from-sky-400 to-cyan-300 text-black text-xs px-2 py-1 rounded-full shadow-lg">
-                        最近使用
-                      </Badge>
-                    </div>
-                  )}
-                  
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="text-4xl mb-2">{mode.icon}</div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge variant="secondary" className="text-xs bg-gradient-to-r from-slate-200 to-cyan-200 text-slate-800 border-0">
-                          学習可能
-                        </Badge>
-                        {newsCount > 0 && (
-                          <Badge variant="outline" className="text-xs border-cyan-500/30 text-cyan-400">
-                            ニュース{newsCount}件
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <CardTitle className="text-lg font-semibold text-white group-hover:text-cyan-200 transition-colors">
-                      {mode.name}
-                    </CardTitle>
-                    <CardDescription className="text-sm text-slate-400 leading-relaxed">
-                      {mode.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <BookOpen className="h-3 w-3" />
-                        <span>詳細を見る</span>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-cyan-200 transition-colors" />
-                    </div>
+        {/* Category News Counts */}
+        {Object.keys(categoryNewsCounts).length > 0 && (
+          <div className="mb-12">
+            <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+              <Newspaper className="h-5 w-5 text-purple-400" />
+              {isKidsMode ? "カテゴリべつ ニュース" : "カテゴリ別ニュース"}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {Object.entries(categoryNewsCounts).map(([category, count]) => (
+                <Card key={category} className="bg-slate-800/50 border-slate-600">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-slate-400 text-sm mb-1">
+                      {labels.categories[category as keyof typeof labels.categories] || category}
+                    </p>
+                    <p className="text-xl font-bold text-white">{count}</p>
                   </CardContent>
                 </Card>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Empty State */}
-        {filteredModes.length === 0 && searchQuery && (
-          <div className="text-center py-16">
-            <div className="p-4 bg-slate-800/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Search className="h-8 w-8 text-slate-400" />
+              ))}
             </div>
-            <p className="text-slate-400 text-lg">該当する学習テーマが見つかりませんでした</p>
           </div>
         )}
       </div>

@@ -66,6 +66,7 @@ interface AppState {
   recentModes: Mode[]
   selectedNewsTopics: string[]
   recentCategories: string[] // 最近使用したカテゴリ
+  isKidsMode: boolean // キッズモードの状態
   
   // Chat sessions
   currentSession: ChatSession | null
@@ -83,6 +84,8 @@ interface AppState {
   addRecentMode: (mode: Mode) => void
   setSelectedNewsTopics: (topics: string[]) => void
   addRecentCategory: (categoryId: string) => void
+  toggleKidsMode: () => void // キッズモード切り替え
+  setKidsMode: (isKidsMode: boolean) => void // キッズモード設定
   createSession: (modeId: string) => ChatSession
   addMessage: (sessionId: string, message: { role: 'user' | 'assistant'; content: string }) => void
   saveReview: (review: Omit<Review, 'id' | 'createdAt'>) => void
@@ -103,6 +106,7 @@ export const useStore = create<AppState>()(
       recentModes: [],
       selectedNewsTopics: [],
       recentCategories: [],
+      isKidsMode: false, // デフォルトは通常モード
       currentSession: null,
       sessions: [],
       reviews: [],
@@ -147,6 +151,10 @@ export const useStore = create<AppState>()(
           recentCategories: updatedCategories
         }
       }),
+      
+      toggleKidsMode: () => set((state) => ({ isKidsMode: !state.isKidsMode })),
+      
+      setKidsMode: (isKidsMode) => set({ isKidsMode }),
       
       createSession: (modeId) => {
         const newSession: ChatSession = {
@@ -319,6 +327,7 @@ export const useStore = create<AppState>()(
         recentModes: state.recentModes,
         selectedNewsTopics: state.selectedNewsTopics,
         recentCategories: state.recentCategories,
+        isKidsMode: state.isKidsMode, // キッズモードの状態も保存
         sessions: state.sessions,
         reviews: state.reviews,
         newsArticles: state.newsArticles,

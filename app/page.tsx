@@ -22,11 +22,15 @@ import {
   ExternalLink,
   Github,
   Twitter,
-  Youtube
+  Youtube,
+  FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Header } from '@/components/ui/header'
+import { useStore } from '@/store/useStore'
+import { useLabels } from '@/lib/kidsLabels'
 import { learningModes } from '@/data/modes'
 
 // アニメーション変数
@@ -72,6 +76,8 @@ const cardHoverVariants = {
 
 export default function LandingPage() {
   const router = useRouter()
+  const { isKidsMode } = useStore()
+  const labels = useLabels(isKidsMode)
   const [activeFAQ, setActiveFAQ] = useState<number | null>(null)
   const [mounted, setMounted] = useState(false)
   const [particles, setParticles] = useState<Array<{
@@ -99,81 +105,26 @@ export default function LandingPage() {
     router.push('/dashboard')
   }
 
-  const features = [
-    {
-      icon: <BookOpen className="h-8 w-8" />,
-      title: "ニュースで学ぶ",
-      description: "毎日のニュースを教材に、AIと対話しながら深く学ぶ",
-      color: "from-slate-200 to-slate-300"
-    },
-    {
-      icon: <MessageSquare className="h-8 w-8" />,
-      title: "AIと対話する",
-      description: "保存したニュースの文脈をもとに、個別化された学習体験",
-      color: "from-slate-300 to-cyan-200"
-    },
-    {
-      icon: <Check className="h-8 w-8" />,
-      title: "レビューで整理する",
-      description: "学んだ内容をデジタル提案として形に残す",
-      color: "from-cyan-200 to-sky-300"
-    }
-  ]
+  const toggleFAQ = (index: number) => {
+    setActiveFAQ(activeFAQ === index ? null : index)
+  }
 
-  const steps = [
-    {
-      number: "01",
-      title: "テーマを選択",
-      description: "9つのカテゴリから興味のあるテーマを選びます",
-      icon: <Target className="h-6 w-6" />
-    },
-    {
-      number: "02",
-      title: "ニュースを保存",
-      description: "関連するニュース記事を保存して学習素材を作成",
-      icon: <BookOpen className="h-6 w-6" />
-    },
-    {
-      number: "03",
-      title: "AIと対話",
-      description: "保存したニュースをもとにAIと深い対話を開始",
-      icon: <MessageSquare className="h-6 w-6" />
-    }
-  ]
-
-  const faqs = [
-    {
-      question: "本当にAIと自然に話せますか？",
-      answer: "保存されたニュースの文脈をもとに学習が始まります。AIがあなたの興味に合わせて最適な学習体験を提供します。"
-    },
-    {
-      question: "専門知識がなくても使えますか？",
-      answer: "テーマを選ぶだけで学習はスタートできます。AIが段階的にサポートし、初心者でも安心して学べます。"
-    },
-    {
-      question: "費用はかかりますか？",
-      answer: "現在は無料プランでご利用いただけます。学びたい気持ちがあれば、すぐに始められます。"
-    },
-    {
-      question: "どのようなニュースが保存できますか？",
-      answer: "ビジネス、テクノロジー、経済、科学、教育、健康、環境、社会、ライフスタイルの9カテゴリのニュースを保存できます。"
-    }
-  ]
+  if (!mounted) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-[#0e1a2a] relative overflow-hidden">
-      {/* Enhanced Background with Aurora Effect */}
+      <Header showHomeButton={false} />
+      
+      {/* Background with particles */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* 背景グラデーション */}
-        <div className="absolute inset-0 bg-gradient-radial from-[#0e1a2a] via-[#1a1f27] to-[#0e1a2a]"></div>
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-sky-500/8 to-transparent"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-t from-blue-600/5 to-transparent rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-br from-indigo-500/3 to-purple-500/3 rounded-full blur-3xl"></div>
+        <div className="absolute top-2/3 right-1/3 w-48 h-48 bg-gradient-to-bl from-emerald-500/2 to-teal-500/2 rounded-full blur-2xl"></div>
         
-        {/* 微細な光の演出 */}
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-white/3 to-transparent"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-t from-cyan-500/2 to-transparent rounded-full blur-3xl"></div>
-        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-br from-slate-300/1 to-cyan-300/1 rounded-full blur-3xl"></div>
-        <div className="absolute top-2/3 right-1/3 w-48 h-48 bg-gradient-to-bl from-white/1 to-slate-300/1 rounded-full blur-2xl"></div>
-        
-        {/* Floating Particles - クライアントサイドでのみレンダリング */}
+        {/* Floating particles */}
         {mounted && (
           <div className="absolute inset-0">
             {particles.map((particle) => (
@@ -198,393 +149,224 @@ export default function LandingPage() {
         initial="hidden"
         animate="visible"
       >
-        {/* Hero Section */}
-        <section className="container mx-auto px-4 py-24">
+        <div className="container mx-auto px-4 py-8">
+          {/* Hero Section */}
           <motion.div 
             className="text-center mb-16"
             variants={itemVariants}
           >
-            <motion.div 
-              className="mb-8"
+            <motion.div
+              className="flex items-center justify-center gap-3 mb-6"
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
             >
-              <Badge className="bg-gradient-to-r from-sky-500/20 to-cyan-400/20 text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-cyan-300 border-sky-500/30 px-6 py-3 rounded-full mb-6 backdrop-blur-sm shadow-lg">
-                <Sparkles className="h-4 w-4 mr-2 text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-cyan-300" />
-                AIと学ぶ新しい学習体験
-              </Badge>
+              <div className="p-3 bg-gradient-to-br from-sky-500 to-cyan-400 rounded-2xl shadow-lg">
+                <Sparkles className="h-8 w-8 text-white" />
+              </div>
+              <span className="text-4xl font-bold text-white">Learnly</span>
             </motion.div>
             
             <motion.h1 
-              className="text-5xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-8"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
+              className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight"
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
             >
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-cyan-100 shadow-[0_0_8px_rgba(255,255,255,0.06)]">
-                AIと学び、
-              </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-cyan-100 to-sky-200 shadow-[0_0_8px_rgba(255,255,255,0.06)]">
-                思考し、
-              </span>
-              <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-100 via-sky-200 to-cyan-300 shadow-[0_0_8px_rgba(255,255,255,0.06)]">
-                提案する力を育てる
-              </span>
+              {labels.hero.title}
             </motion.h1>
             
             <motion.p 
-              className="text-xl text-slate-400 leading-relaxed max-w-3xl mx-auto mb-12"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              className="text-xl text-slate-400 mb-8 max-w-3xl mx-auto leading-relaxed"
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.7 }}
             >
-              保存したニュースを教材に、対話で深める新しい学び。
-              毎日変わる世界から、あなたに最適な学習体験を。
+              {labels.hero.description}
             </motion.p>
             
             <motion.div 
               className="flex flex-col sm:flex-row gap-4 justify-center"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.9 }}
             >
               <Button
                 onClick={handleGetStarted}
-                size="lg"
-                className="bg-gradient-to-r from-sky-400 to-cyan-300 text-black text-lg px-8 py-4 rounded-full hover:scale-[1.03] transition-all shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:shadow-[0_15px_40px_rgba(56,189,248,0.3)]"
+                className="bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-500 hover:to-cyan-400 text-black text-lg px-8 py-4 rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
               >
-                無料ではじめる
+                {labels.buttons.startFree}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
+              
               <Button
                 variant="outline"
-                size="lg"
-                className="border-slate-600/50 text-slate-300 hover:border-cyan-400/50 hover:text-cyan-200 text-lg px-8 py-4 rounded-full hover:scale-[1.03] transition-all backdrop-blur-sm bg-white/5"
+                className="border-slate-600 text-slate-300 hover:border-cyan-400 hover:text-cyan-300 text-lg px-8 py-4 rounded-xl backdrop-blur-sm"
               >
                 <Play className="mr-2 h-5 w-5" />
-                デモを見る
+                {isKidsMode ? "ためしに みてみよう" : "デモを見る"}
               </Button>
             </motion.div>
-
-            {/* Trust indicators */}
-            <motion.div 
-              className="flex items-center justify-center gap-8 pt-12"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 1.1 }}
-            >
-              <div className="flex items-center gap-3 text-sm text-slate-400 bg-slate-800/30 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-700/30">
-                <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center">
-                  <Check className="h-4 w-4 text-cyan-200" />
-                </div>
-                <span>無料で利用可能</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-400 bg-slate-800/30 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-700/30">
-                <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center">
-                  <Shield className="h-4 w-4 text-cyan-200" />
-                </div>
-                <span>セキュア</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-400 bg-slate-800/30 backdrop-blur-sm px-4 py-2 rounded-full border border-slate-700/30">
-                <div className="w-8 h-8 bg-slate-700/50 rounded-full flex items-center justify-center">
-                  <Zap className="h-4 w-4 text-cyan-200" />
-                </div>
-                <span>即座に開始</span>
-              </div>
-            </motion.div>
           </motion.div>
-        </section>
 
-        {/* Features Section */}
-        <section className="container mx-auto px-4 py-24 border-t border-slate-800/50">
+          {/* Features Section */}
           <motion.div 
-            className="text-center mb-16"
+            className="mb-16"
             variants={itemVariants}
           >
-            <h2 className="text-4xl font-bold text-white mb-4">
-              Learnlyの特徴
-            </h2>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-              従来の学習プラットフォームとは一線を画す、革新的なアプローチ
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {features.map((feature, index) => (
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                {labels.features.title}
+              </h2>
+              <p className="text-lg text-slate-400">
+                {labels.features.subtitle}
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <motion.div
-                key={index}
                 variants={cardHoverVariants}
                 initial="rest"
                 whileHover="hover"
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.3 }}
               >
-                <Card className="bg-[#1c1f26] backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 text-center shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 hover:ring-1 hover:ring-cyan-500/30 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
-                  <div className={`w-16 h-16 bg-gradient-to-r ${feature.color} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg border border-slate-600/30`}>
-                    <div className="text-slate-200">
-                      {feature.icon}
+                <Card className="bg-slate-800/50 border-slate-600 h-full">
+                  <CardHeader>
+                    <div className="p-3 bg-blue-500/20 rounded-lg w-fit mb-4">
+                      <BookOpen className="h-6 w-6 text-blue-400" />
                     </div>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-4 tracking-tight">{feature.title}</h3>
-                  <p className="text-slate-400 leading-relaxed">{feature.description}</p>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Steps Section */}
-        <section className="container mx-auto px-4 py-24 border-t border-slate-800/50">
-          <motion.div 
-            className="text-center mb-16"
-            variants={itemVariants}
-          >
-            <h2 className="text-4xl font-bold text-white mb-4">
-              3ステップで始まる学習体験
-            </h2>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-              興味あるテーマを選び、ニュースを保存し、AIと対話して深掘りする
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {steps.map((step, index) => (
-              <motion.div
-                key={index}
-                variants={cardHoverVariants}
-                initial="rest"
-                whileHover="hover"
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card className="bg-[#1c1f26] backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 text-center shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 hover:ring-1 hover:ring-cyan-500/30 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]">
-                  <div className="w-16 h-16 bg-gradient-to-r from-slate-200 to-cyan-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg border border-slate-600/30">
-                    <span className="text-slate-800 text-2xl font-bold">{step.number}</span>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-r from-cyan-200 to-sky-300 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg border border-slate-600/30">
-                    <div className="text-slate-800">
-                      {step.icon}
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-4 tracking-tight">{step.title}</h3>
-                  <p className="text-slate-400 leading-relaxed">{step.description}</p>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* UI Screenshots Section */}
-        <section className="container mx-auto px-4 py-24 border-t border-slate-800/50">
-          <motion.div 
-            className="text-center mb-16"
-            variants={itemVariants}
-          >
-            <h2 className="text-4xl font-bold text-white mb-4">
-              実際の画面イメージ
-            </h2>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-              直感的で美しいインターフェースで、学習をより楽しく
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <motion.div
-              variants={cardHoverVariants}
-              initial="rest"
-              whileHover="hover"
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.3 }}
-              className="h-full"
-            >
-              <Card className="bg-gradient-to-br from-[#1a1f27] to-[#111827] backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)] h-full flex flex-col">
-                <div className="bg-gradient-to-br from-slate-700/30 to-slate-600/30 rounded-xl p-4 mb-4 border border-slate-600/30">
-                  <h3 className="text-lg font-semibold text-white mb-2">ダッシュボード</h3>
-                  <p className="text-sm text-slate-400">9つのカテゴリから学習テーマを選択</p>
-                </div>
-                <div className="grid grid-cols-3 gap-2 flex-1">
-                  {learningModes.slice(0, 3).map((mode, index) => (
-                    <div key={mode.id} className="bg-slate-800/30 backdrop-blur-sm rounded-lg p-3 text-center border border-slate-700/30 flex flex-col justify-center">
-                      <div className="text-2xl mb-1 text-slate-200">{mode.icon}</div>
-                      <p className="text-xs text-slate-400">{mode.name}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              variants={cardHoverVariants}
-              initial="rest"
-              whileHover="hover"
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.3 }}
-              className="h-full"
-            >
-              <Card className="bg-gradient-to-br from-[#1a1f27] to-[#111827] backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)] h-full flex flex-col">
-                <div className="bg-gradient-to-br from-slate-700/30 to-slate-600/30 rounded-xl p-4 mb-4 border border-slate-600/30">
-                  <h3 className="text-lg font-semibold text-white mb-2">AIチャット</h3>
-                  <p className="text-sm text-slate-400">保存したニュースをもとに深い対話</p>
-                </div>
-                <div className="space-y-3 flex-1 flex flex-col justify-center">
-                  <div className="bg-slate-800/30 backdrop-blur-sm rounded-lg p-3 border border-slate-700/30">
-                    <p className="text-sm text-slate-400">このニュースについて詳しく教えてください</p>
-                  </div>
-                  <div className="bg-gradient-to-r from-cyan-500/20 to-sky-500/20 backdrop-blur-sm rounded-lg p-3 border border-cyan-500/30">
-                    <p className="text-sm text-white">このニュースの背景と影響について詳しく解説します...</p>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              variants={cardHoverVariants}
-              initial="rest"
-              whileHover="hover"
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.3 }}
-              className="h-full"
-            >
-              <Card className="bg-gradient-to-br from-[#1a1f27] to-[#111827] backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)] h-full flex flex-col">
-                <div className="bg-gradient-to-br from-slate-700/30 to-slate-600/30 rounded-xl p-4 mb-4 border border-slate-600/30">
-                  <h3 className="text-lg font-semibold text-white mb-2">学習履歴</h3>
-                  <p className="text-sm text-slate-400">保存したニュースと学習記録を管理</p>
-                </div>
-                <div className="space-y-2 flex-1 flex flex-col justify-center">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-slate-800/30 backdrop-blur-sm rounded-lg p-2 flex items-center gap-2 border border-slate-700/30">
-                      <div className="w-2 h-2 bg-cyan-300 rounded-full"></div>
-                      <p className="text-xs text-slate-400">学習記録 {i}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* FAQ Section */}
-        <section className="container mx-auto px-4 py-24 border-t border-slate-800/50">
-          <motion.div 
-            className="text-center mb-16"
-            variants={itemVariants}
-          >
-            <h2 className="text-4xl font-bold text-white mb-4">
-              よくある質問
-            </h2>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-              よくいただく質問とその回答をご紹介します
-            </p>
-          </motion.div>
-
-          <div className="max-w-4xl mx-auto space-y-4">
-            {faqs.map((faq, index) => (
-              <motion.div
-                key={index}
-                variants={itemVariants}
-                initial="hidden"
-                animate="visible"
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card 
-                  className="bg-[#1c1f26] backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.6)] transition-all duration-300 cursor-pointer hover:ring-1 hover:ring-cyan-500/30 shadow-[inset_0_0_30px_rgba(255,255,255,0.03)]"
-                  onClick={() => setActiveFAQ(activeFAQ === index ? null : index)}
-                >
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-white text-lg font-medium hover:text-cyan-200 transition-colors">{faq.question}</CardTitle>
-                      <ChevronDown 
-                        className={`h-5 w-5 text-slate-400 transition-transform duration-200 ${
-                          activeFAQ === index ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
+                    <CardTitle className="text-white text-xl">
+                      {isKidsMode ? "ニュースから まなぼう" : "ニュースで学ぶ"}
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      {isKidsMode ? "まいにちの ニュースを つかって べんきょうしよう" : "毎日のニュースを教材に学習"}
+                    </CardDescription>
                   </CardHeader>
-                  {activeFAQ === index && (
-                    <CardContent className="pt-0">
-                      <p className="text-slate-400 leading-relaxed">{faq.answer}</p>
-                    </CardContent>
-                  )}
                 </Card>
               </motion.div>
-            ))}
-          </div>
-        </section>
+              
+              <motion.div
+                variants={cardHoverVariants}
+                initial="rest"
+                whileHover="hover"
+              >
+                <Card className="bg-slate-800/50 border-slate-600 h-full">
+                  <CardHeader>
+                    <div className="p-3 bg-green-500/20 rounded-lg w-fit mb-4">
+                      <MessageSquare className="h-6 w-6 text-green-400" />
+                    </div>
+                    <CardTitle className="text-white text-xl">
+                      {isKidsMode ? "AIと おしゃべりして かんがえよう" : "AIと対話する"}
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      {isKidsMode ? "AIと おしゃべりしながら かんがえる ちからを やしなおう" : "AIと対話しながら考える力を育む"}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+              
+              <motion.div
+                variants={cardHoverVariants}
+                initial="rest"
+                whileHover="hover"
+              >
+                <Card className="bg-slate-800/50 border-slate-600 h-full">
+                  <CardHeader>
+                    <div className="p-3 bg-purple-500/20 rounded-lg w-fit mb-4">
+                      <FileText className="h-6 w-6 text-purple-400" />
+                    </div>
+                    <CardTitle className="text-white text-xl">
+                      {isKidsMode ? "まとめを つくろう" : "レビューを作成"}
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      {isKidsMode ? "まなんだ ことを まとめて じぶんの ことばで かんがえよう" : "学んだ内容をまとめて自分の言葉で考える"}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+            </div>
+          </motion.div>
 
-        {/* CTA Section */}
-        <section className="container mx-auto px-4 py-24 border-t border-slate-800/50">
+          {/* FAQ Section */}
+          <motion.div 
+            className="mb-16"
+            variants={itemVariants}
+          >
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                {labels.faq.title}
+              </h2>
+              <p className="text-lg text-slate-400">
+                {labels.faq.subtitle}
+              </p>
+            </div>
+            
+            <div className="max-w-3xl mx-auto space-y-4">
+              {[
+                { key: 'aiChat', question: labels.faq.questions.aiChat, answer: labels.faq.questions.aiChatAnswer },
+                { key: 'noKnowledge', question: labels.faq.questions.noKnowledge, answer: labels.faq.questions.noKnowledgeAnswer },
+                { key: 'cost', question: labels.faq.questions.cost, answer: labels.faq.questions.costAnswer },
+                { key: 'newsTypes', question: labels.faq.questions.newsTypes, answer: labels.faq.questions.newsTypesAnswer }
+              ].map((faq, index) => (
+                <motion.div
+                  key={faq.key}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <Card className="bg-slate-800/50 border-slate-600">
+                    <CardHeader 
+                      className="cursor-pointer"
+                      onClick={() => toggleFAQ(index)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-white text-lg">
+                          {faq.question}
+                        </CardTitle>
+                        <ChevronDown 
+                          className={`h-5 w-5 text-slate-400 transition-transform ${
+                            activeFAQ === index ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </div>
+                    </CardHeader>
+                    {activeFAQ === index && (
+                      <CardContent className="pt-0">
+                        <p className="text-slate-400 leading-relaxed">
+                          {faq.answer}
+                        </p>
+                      </CardContent>
+                    )}
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* CTA Section */}
           <motion.div 
             className="text-center"
             variants={itemVariants}
           >
-            <h2 className="text-4xl font-bold text-white mb-6">
-              学びたい気持ちがあるなら、あとは「保存」するだけ
-            </h2>
-            <p className="text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
-              今すぐ始めて、AIと共に新しい学習体験を始めましょう
-            </p>
-            <Button
-              onClick={handleGetStarted}
-              size="lg"
-              className="bg-gradient-to-r from-sky-400 to-cyan-300 text-black text-lg px-8 py-4 rounded-full hover:scale-[1.03] transition-all shadow-[0_10px_30px_rgba(56,189,248,0.2)] hover:shadow-[0_15px_40px_rgba(56,189,248,0.3)]"
-            >
-              無料ではじめる
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+            <Card className="bg-gradient-to-r from-sky-500/10 to-cyan-400/10 border-sky-500/30">
+              <CardContent className="p-8">
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  {labels.cta.title}
+                </h2>
+                <p className="text-lg text-slate-300 mb-6">
+                  {labels.cta.description}
+                </p>
+                <Button
+                  onClick={handleGetStarted}
+                  className="bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-500 hover:to-cyan-400 text-black text-lg px-8 py-4 rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
+                >
+                  {labels.buttons.startFree}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </CardContent>
+            </Card>
           </motion.div>
-        </section>
-
-        {/* Footer */}
-        <footer className="container mx-auto px-4 py-12 border-t border-slate-800/50">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="p-2 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl shadow-lg">
-                  <Sparkles className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-xl font-bold bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 bg-clip-text text-transparent">Learnly</span>
-              </div>
-              <p className="text-slate-400 mb-4 max-w-md">
-                AIと共に学び、思考し、提案する力を育てる。毎日変わる世界から、あなたに最適な学習体験を。
-              </p>
-              <div className="flex space-x-4">
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-cyan-200 bg-slate-800/30 backdrop-blur-sm">
-                  <Twitter className="h-5 w-5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-cyan-200 bg-slate-800/30 backdrop-blur-sm">
-                  <Github className="h-5 w-5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-cyan-200 bg-slate-800/30 backdrop-blur-sm">
-                  <Youtube className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-white font-semibold mb-4">製品</h3>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-slate-400 hover:text-cyan-200 transition-colors">機能</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-cyan-200 transition-colors">プラン</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-cyan-200 transition-colors">API</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="text-white font-semibold mb-4">サポート</h3>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-slate-400 hover:text-cyan-200 transition-colors">ヘルプセンター</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-cyan-200 transition-colors">お問い合わせ</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-cyan-200 transition-colors">コミュニティ</a></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-slate-800/50 mt-8 pt-8 text-center">
-            <p className="text-slate-400">© 2025 Learnly. All rights reserved.</p>
-          </div>
-        </footer>
+        </div>
       </motion.div>
     </div>
   )
