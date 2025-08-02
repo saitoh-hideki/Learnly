@@ -26,10 +26,10 @@ export default function RootLayout({
             <div className="container mx-auto flex items-center justify-between">
               {/* Logo */}
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl shadow-lg">
+                <div className="p-2 bg-gradient-to-r from-sky-500 to-blue-600 rounded-lg shadow-lg">
                   <Sparkles className="h-6 w-6 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-white">
                   Learnly
                 </h1>
               </div>
