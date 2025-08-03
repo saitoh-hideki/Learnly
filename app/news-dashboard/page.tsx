@@ -54,42 +54,8 @@ const cardHoverVariants = {
   }
 }
 
-// ダミーのニュースデータ
-const dummyNews: NewsArticle[] = [
-  {
-    id: '1',
-    title: 'AI技術の最新動向：生成AIが教育分野に革新をもたらす',
-    summary: 'OpenAIが発表した新しい教育向けAIツールが、個別指導の質を大幅に向上させる可能性を示唆。',
-    source: 'TechCrunch',
-    category: 'technology',
-    publishedAt: '2024-01-15',
-    url: '#',
-    topics: ['technology'],
-    createdAt: new Date()
-  },
-  {
-    id: '2',
-    title: 'サステナブルな都市計画：グリーンインフラの新潮流',
-    summary: '世界の主要都市で進む環境配慮型の都市開発プロジェクトとその経済効果について。',
-    source: 'Bloomberg',
-    category: 'environment',
-    publishedAt: '2024-01-15',
-    url: '#',
-    topics: ['environment'],
-    createdAt: new Date()
-  },
-  {
-    id: '3',
-    title: 'リモートワーク時代の新しいチームマネジメント手法',
-    summary: 'ハイブリッドワーク環境での生産性向上とチームエンゲージメント維持のための最新手法。',
-    source: 'Harvard Business Review',
-    category: 'business',
-    publishedAt: '2024-01-15',
-    url: '#',
-    topics: ['business'],
-    createdAt: new Date()
-  }
-]
+// 空のニュースデータ（ダミーデータを削除）
+const dummyNews: NewsArticle[] = []
 
 const categories = [
   { id: 'all', name: 'すべて', icon: '📰' },
@@ -129,30 +95,77 @@ export default function NewsDashboardPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [selectedNews, setSelectedNews] = useState<NewsArticle | null>(null)
   const [showLearningOptions, setShowLearningOptions] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // ニュースデータを取得
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        setIsLoading(true)
-        const response = await fetch('/api/latest-news')
-        if (response.ok) {
-          const data = await response.json()
-          setNews(data.news || dummyNews)
-        } else {
-          // エラー時はダミーデータを使用
-          setNews(dummyNews)
-        }
-      } catch (error) {
-        console.error('Error fetching news:', error)
-        setNews(dummyNews)
-      } finally {
-        setIsLoading(false)
+  const fetchNews = async () => {
+    try {
+      setIsLoading(true)
+      console.log('Fetching news from /api/latest-news...')
+      const response = await fetch('/api/latest-news')
+      console.log('Response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Raw API response:', data)
+        console.log('News count from API:', data.news?.length || 0)
+        
+        // データベースの形式をNewsArticle型に変換
+        const formattedNews = (data.news || []).map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          summary: item.summary,
+          url: item.url,
+          source: item.source,
+          category: item.category,
+          publishedAt: item.published_at,
+          topics: item.topics || [item.category], // topicsフィールドを使用
+          createdAt: new Date(item.created_at)
+        }))
+        
+        console.log('Formatted news count:', formattedNews.length)
+        console.log('Formatted news:', formattedNews)
+        
+        // 作成日時で降順にソート（最新のものが上に来る）
+        const sortedNews = formattedNews.sort((a: NewsArticle, b: NewsArticle) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        
+        console.log('Sorted news count:', sortedNews.length)
+        console.log('Top 3 news items:', sortedNews.slice(0, 3))
+        
+        setNews(sortedNews)
+      } else {
+        console.error('API response not ok:', response.status, response.statusText)
+        // エラー時は空の配列を使用
+        setNews([])
       }
+    } catch (error) {
+      console.error('Error fetching news:', error)
+      setNews([])
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
     }
+  }
 
+  // 手動でニュースを再取得
+  const handleRefreshNews = async () => {
+    setIsRefreshing(true)
+    await fetchNews()
+  }
+
+  // 初回読み込み時に少し待ってから再取得（データベースの更新を確実に反映）
+  useEffect(() => {
     fetchNews()
-  }, [])
+
+    // 5分ごとにニュースを更新
+    const interval = setInterval(fetchNews, 5 * 60 * 1000)
+
+    return () => {
+      clearInterval(interval)
+    }
+  }, []) // fetchNewsは関数なので依存関係に含めない
 
   // 保存済みニュースのIDを取得
   useEffect(() => {
@@ -209,7 +222,7 @@ export default function NewsDashboardPage() {
           source: news.source,
           category: news.category,
           publishedAt: news.publishedAt,
-          topics: [news.category]
+          topics: news.topics || [news.category] // topicsフィールドを正しく送信
         }),
       })
 
@@ -310,6 +323,16 @@ export default function NewsDashboardPage() {
             
             <Button
               variant="outline"
+              onClick={handleRefreshNews}
+              disabled={isRefreshing}
+              className="border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isKidsMode ? "更新" : "更新"}
+            </Button>
+            
+            <Button
+              variant="outline"
               onClick={() => setShowFilters(!showFilters)}
               className="border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300"
             >
@@ -357,122 +380,177 @@ export default function NewsDashboardPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
         >
-          {isLoading ? (
-            // Loading skeleton
-            Array.from({ length: 6 }).map((_, index) => (
-              <Card key={index} className="bg-slate-800/50 border-slate-600 animate-pulse">
-                <CardHeader>
-                  <div className="h-4 bg-slate-700 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-slate-700 rounded w-1/2"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-20 bg-slate-700 rounded mb-4"></div>
-                  <div className="flex justify-between">
-                    <div className="h-3 bg-slate-700 rounded w-1/4"></div>
-                    <div className="h-3 bg-slate-700 rounded w-1/4"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : filteredNews.length > 0 ? (
-            filteredNews.map((newsItem, index) => (
-              <motion.div
-                key={newsItem.id}
-                variants={itemVariants}
-                whileHover="hover"
-                initial="rest"
-                animate="rest"
-              >
-                <Card
-                  className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group"
-                  onClick={() => handleNewsSelect(newsItem)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-white text-lg line-clamp-2 group-hover:text-blue-300 transition-colors">
-                          {newsItem.title}
-                        </CardTitle>
-                        <CardDescription className="text-slate-400 mt-2 line-clamp-3">
-                          {newsItem.summary}
-                        </CardDescription>
-                      </div>
-                    </div>
+          {/* 上段3つのニュースの説明 */}
+          {filteredNews.length > 0 && (
+            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="flex items-center gap-2 text-blue-300 text-sm">
+                <Sparkles className="h-4 w-4" />
+                <span>
+                  {isKidsMode 
+                    ? "うえの 3つの ニュースが さいきん えらばれた テーマの ニュースだよ！" 
+                    : "上段3つのニュースが最新の選択テーマのニュースです"
+                  }
+                </span>
+              </div>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+            {isLoading ? (
+              // Loading skeleton
+              Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="bg-slate-800/50 border-slate-600 animate-pulse">
+                  <CardHeader>
+                    <div className="h-4 bg-slate-700 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-slate-700 rounded w-1/2"></div>
                   </CardHeader>
-                  
                   <CardContent>
-                    <div className="space-y-3">
-                      {/* Category and Source */}
-                      <div className="flex items-center justify-between">
-                        <Badge 
-                          variant="outline" 
-                          className={`${getCategoryColor(newsItem.category)}`}
-                        >
-                          {isKidsMode 
-                            ? labels.categories[newsItem.category as keyof typeof labels.categories] || newsItem.category
-                            : topicNames[newsItem.category] || newsItem.category
-                          }
-                        </Badge>
-                        <span className="text-xs text-slate-500">
-                          {newsItem.source}
-                        </span>
-                      </div>
-
-                      {/* Date and Actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(newsItem.publishedAt)}
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSaveNews(newsItem)
-                            }}
-                            className={`p-1 h-8 w-8 ${
-                              savedNewsIds.has(newsItem.id)
-                                ? 'text-yellow-400 hover:text-yellow-300'
-                                : 'text-slate-400 hover:text-yellow-400'
-                            }`}
-                          >
-                            <Bookmark className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              window.open(newsItem.url, '_blank')
-                            }}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-blue-400"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                    <div className="h-20 bg-slate-700 rounded mb-4"></div>
+                    <div className="flex justify-between">
+                      <div className="h-3 bg-slate-700 rounded w-1/4"></div>
+                      <div className="h-3 bg-slate-700 rounded w-1/4"></div>
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))
-          ) : (
-            // Empty state
-            <div className="col-span-full text-center py-16">
-              <div className="p-4 bg-slate-800/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <Search className="h-8 w-8 text-slate-400" />
+              ))
+            ) : filteredNews.length > 0 ? (
+              filteredNews.map((newsItem, index) => (
+                <motion.div
+                  key={newsItem.id}
+                  variants={itemVariants}
+                  whileHover="hover"
+                  initial="rest"
+                  animate="rest"
+                  className={index < 3 ? "relative" : ""}
+                >
+                  {/* 上段3つのニュースには特別なスタイルを適用 */}
+                  {index < 3 && (
+                    <div className="absolute -top-2 -left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center z-10">
+                      <span className="text-white text-xs font-bold">{index + 1}</span>
+                    </div>
+                  )}
+                  
+                  <Card
+                    className={`bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group h-full flex flex-col hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 ${
+                      index < 3 ? "ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20" : ""
+                    }`}
+                    onClick={() => handleNewsSelect(newsItem)}
+                  >
+                    <CardHeader className="pb-3 flex-1">
+                      <div className="flex items-start justify-between h-full">
+                        <div className="flex-1">
+                          <CardTitle className="text-white text-lg line-clamp-2 group-hover:text-blue-300 transition-colors mb-2 group-hover:scale-105">
+                            {newsItem.title}
+                          </CardTitle>
+                          <CardDescription className="text-slate-400 line-clamp-3 flex-1">
+                            {newsItem.summary}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent>
+                      <div className="space-y-3">
+                        {/* Category and Source */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap gap-1">
+                            {/* メインカテゴリータグ */}
+                            <Badge 
+                              variant="outline" 
+                              className={`${getCategoryColor(newsItem.category)}`}
+                            >
+                              {isKidsMode 
+                                ? labels.categories[newsItem.category as keyof typeof labels.categories] || newsItem.category
+                                : topicNames[newsItem.category] || newsItem.category
+                              }
+                            </Badge>
+                            
+                            {/* Topicsタグ（メインカテゴリーと異なる場合のみ表示） */}
+                            {newsItem.topics && newsItem.topics.length > 0 && 
+                             newsItem.topics.filter(topic => topic !== newsItem.category).map((topic, index) => (
+                              <Badge 
+                                key={index}
+                                variant="outline" 
+                                className="bg-slate-600/20 text-slate-300 border-slate-500/30"
+                              >
+                                {isKidsMode 
+                                  ? labels.categories[topic as keyof typeof labels.categories] || topic
+                                  : topicNames[topic] || topic
+                                }
+                              </Badge>
+                            ))}
+                          </div>
+                          <span className="text-xs text-slate-500">
+                            {newsItem.source}
+                          </span>
+                        </div>
+
+                        {/* Date and Actions */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(newsItem.publishedAt)}
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSaveNews(newsItem)
+                              }}
+                              className={`p-1 h-8 w-8 transition-all duration-200 hover:scale-110 ${
+                                savedNewsIds.has(newsItem.id)
+                                  ? 'text-yellow-400 hover:text-yellow-300'
+                                  : 'text-slate-400 hover:text-yellow-400'
+                              }`}
+                            >
+                              <Bookmark className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.open(newsItem.url, '_blank')
+                              }}
+                              className="p-1 h-8 w-8 text-slate-400 hover:text-blue-400 transition-all duration-200 hover:scale-110"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))
+            ) : (
+              // Empty state
+              <div className="col-span-full text-center py-16">
+                <div className="p-4 bg-slate-800/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <Search className="h-8 w-8 text-slate-400" />
+                </div>
+                <p className="text-slate-400 text-lg mb-4">
+                  {isKidsMode 
+                    ? "ニュースが まだ ないよ。ニューストピックで えらんでね！" 
+                    : "ニュースがまだありません。ニューストピックで選択してください"
+                  }
+                </p>
+                <Button
+                  onClick={() => router.push('/news-topics')}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {isKidsMode ? "ニューストピックへ" : "ニューストピックへ"}
+                </Button>
               </div>
-              <p className="text-slate-400 text-lg">
-                {isKidsMode ? "ニュースが みつからないよ" : "ニュースが見つかりませんでした"}
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </motion.div>
 
         {/* Learning Options Modal */}

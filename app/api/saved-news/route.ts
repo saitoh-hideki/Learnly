@@ -74,7 +74,11 @@ export async function POST(request: NextRequest) {
 
     if (existingNews) {
       console.log('News already exists:', existingNews)
-      return NextResponse.json({ error: 'News already saved' }, { status: 409 })
+      // 409エラーの場合は、エラーメッセージをより親切に
+      return NextResponse.json({ 
+        message: 'News already exists', 
+        status: 'duplicate' 
+      }, { status: 409 })
     }
 
     console.log('Inserting new news with data:', {

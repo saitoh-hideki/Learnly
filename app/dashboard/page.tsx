@@ -62,6 +62,21 @@ export default function DashboardPage() {
     mode.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const getCategoryColor = (category: string) => {
+    const colors: { [key: string]: string } = {
+      business: 'text-blue-300',
+      technology: 'text-purple-300',
+      economics: 'text-green-300',
+      science: 'text-cyan-300',
+      education: 'text-orange-300',
+      health: 'text-red-300',
+      environment: 'text-emerald-300',
+      society: 'text-indigo-300',
+      lifestyle: 'text-pink-300'
+    }
+    return colors[category] || 'text-slate-300'
+  }
+
   const handleModeSelect = (mode: typeof mainLearningModes[0] | typeof learningModes[0]) => {
     console.log('handleModeSelect called with mode:', mode)
     setSelectedMode(mode)
@@ -230,7 +245,7 @@ export default function DashboardPage() {
                       <BookOpen className="h-5 w-5 text-green-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-white text-base">
+                      <CardTitle className={`text-base ${getCategoryColor(mode.id)}`}>
                         {mode.name}
                       </CardTitle>
                       <CardDescription className="text-slate-400 text-sm">
