@@ -76,6 +76,9 @@ export default function NewsStockPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedNews, setSelectedNews] = useState<SavedNews | null>(null)
+  const [showLearningOptions, setShowLearningOptions] = useState(false)
 
   // カテゴリーの定義（ダッシュボードと合わせる）
   const categories = [
@@ -90,6 +93,18 @@ export default function NewsStockPage() {
     { id: 'society', name: '社会・政治', icon: '🏛️' },
     { id: 'lifestyle', name: '文化・ライフスタイル', icon: '🌟' }
   ]
+
+  const topicNames: { [key: string]: string } = {
+    'business': 'ビジネス・経営',
+    'technology': 'テクノロジー・IT',
+    'economics': '経済・金融',
+    'science': '科学・研究',
+    'education': '教育・学習',
+    'health': '健康・医療',
+    'environment': '環境・サステナビリティ',
+    'society': '社会・政治',
+    'lifestyle': '文化・ライフスタイル'
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -150,9 +165,16 @@ export default function NewsStockPage() {
     }
   }
 
-  const handleLearningStart = (action: 'deep-dive' | 'chat' | 'output', news: SavedNews) => {
+  const handleNewsSelect = (news: SavedNews) => {
+    setSelectedNews(news)
+    setShowLearningOptions(true)
+  }
+
+  const handleLearningStart = (action: 'deep-dive' | 'chat' | 'output') => {
+    if (!selectedNews) return
+
     // 選択されたニュースをセッションストレージに保存
-    sessionStorage.setItem('selectedNews', JSON.stringify(news))
+    sessionStorage.setItem('selectedNews', JSON.stringify(selectedNews))
     sessionStorage.setItem('learningAction', action)
 
     // チャットページに遷移
@@ -223,71 +245,108 @@ export default function NewsStockPage() {
 
         {/* Search and Filter Bar */}
         <div className="mb-8">
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
               <Input
                 type="text"
-                placeholder={isKidsMode ? "とっておいた ニュースを さがそう" : "保存したニュースを検索"}
+                placeholder={isKidsMode ? "ニュースを さがそう" : "ニュースを検索"}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500"
               />
             </div>
+            
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300"
+            >
+              <Tag className="h-4 w-4 mr-2" />
+              {isKidsMode ? "フィルター" : "フィルター"}
+            </Button>
+            
+            {filteredNews.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (confirm(isKidsMode ? 'すべての 保存した ニュースを けしますか？' : 'すべての保存したニュースを削除しますか？')) {
+                    try {
+                      console.log('Attempting to clear all saved news...')
+                      const response = await fetch('/api/saved-news?clearAll=true', {
+                        method: 'DELETE'
+                      })
+                      
+                      if (response.ok) {
+                        const result = await response.json()
+                        console.log('Clear result:', result)
+                        
+                        // ニュースリストを再取得
+                        await fetchSavedNews()
+                        
+                        // 成功メッセージを表示
+                        alert(isKidsMode ? 'すべて けしたよ！' : 'すべて削除しました！')
+                      } else {
+                        console.error('Failed to clear saved news:', response.status)
+                        alert(isKidsMode ? 'けすのに しっぱいしたよ' : '削除に失敗しました')
+                      }
+                    } catch (error) {
+                      console.error('Error clearing saved news:', error)
+                      alert(isKidsMode ? 'けすのに しっぱいしたよ' : '削除に失敗しました')
+                    }
+                  }
+                }}
+                className="border-red-500/30 text-red-300 hover:border-red-500 hover:text-red-200"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {isKidsMode ? "すべて けす" : "すべて削除"}
+              </Button>
+            )}
           </div>
 
           {/* Category Filters */}
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={selectedCategory === category.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(category.id)}
-                className={`${
-                  selectedCategory === category.id
-                    ? 'bg-blue-500 text-white'
-                    : 'border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300'
-                }`}
-              >
-                <span className="mr-1">{category.icon}</span>
-                {isKidsMode 
-                  ? (category.id === 'all' ? 'すべて' : labels.categories[category.id as keyof typeof labels.categories] || category.name)
-                  : category.name
-                }
-              </Button>
-            ))}
-          </div>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 p-4 bg-slate-800/50 border border-slate-600 rounded-lg"
+            >
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`${
+                      selectedCategory === category.id
+                        ? 'bg-blue-500 text-white'
+                        : 'border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300'
+                    }`}
+                  >
+                    <span className="mr-1">{category.icon}</span>
+                    {isKidsMode 
+                      ? (category.id === 'all' ? 'すべて' : labels.categories[category.id as keyof typeof labels.categories] || category.name)
+                      : category.name
+                    }
+                  </Button>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
 
-        {/* Stats */}
-        <div className="mb-8">
-          <Card className="bg-slate-800/50 border-slate-600">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm">
-                    {isKidsMode ? "とっておいた ニュースの かず" : "保存済みニュース数"}
-                  </p>
-                  <p className="text-2xl font-bold text-white">
-                    {savedNews.length}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-500/20 rounded-lg">
-                  <Check className="h-6 w-6 text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
 
         {/* News Grid */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
         >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
           {isLoading ? (
             // Loading skeleton
             Array.from({ length: 6 }).map((_, index) => (
@@ -313,15 +372,19 @@ export default function NewsStockPage() {
                 whileHover="hover"
                 initial="rest"
                 animate="rest"
+                className="relative"
               >
-                <Card className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
+                <Card
+                  className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group h-full flex flex-col hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                  onClick={() => handleNewsSelect(news)}
+                >
+                  <CardHeader className="pb-3 flex-1">
+                    <div className="flex items-start justify-between h-full">
                       <div className="flex-1">
-                        <CardTitle className="text-white text-lg line-clamp-2">
+                        <CardTitle className="text-white text-lg line-clamp-2 group-hover:text-blue-300 transition-colors mb-2 group-hover:scale-105">
                           {news.title}
                         </CardTitle>
-                        <CardDescription className="text-slate-400 mt-2 line-clamp-3">
+                        <CardDescription className="text-slate-400 line-clamp-3 flex-1">
                           {news.summary}
                         </CardDescription>
                       </div>
@@ -332,34 +395,57 @@ export default function NewsStockPage() {
                     <div className="space-y-3">
                       {/* Category and Source */}
                       <div className="flex items-center justify-between">
-                        <Badge 
-                          variant="outline" 
-                          className={`${getCategoryColor(news.category)}`}
-                        >
-                          {isKidsMode 
-                            ? labels.categories[news.category as keyof typeof labels.categories] || news.category
-                            : news.category
-                          }
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {/* メインカテゴリータグ */}
+                          <Badge 
+                            variant="outline" 
+                            className={`${getCategoryColor(news.category)}`}
+                          >
+                            {isKidsMode 
+                              ? labels.categories[news.category as keyof typeof labels.categories] || news.category
+                              : topicNames[news.category] || news.category
+                            }
+                          </Badge>
+                          
+                          {/* Topicsタグ（メインカテゴリーと異なる場合のみ表示） */}
+                          {news.topics && news.topics.length > 0 && 
+                           news.topics.filter(topic => topic !== news.category).map((topic, index) => (
+                            <Badge 
+                              key={index}
+                              variant="outline" 
+                              className="bg-slate-600/20 text-slate-300 border-slate-500/30"
+                            >
+                              {isKidsMode 
+                                ? labels.categories[topic as keyof typeof labels.categories] || topic
+                                : topicNames[topic] || topic
+                              }
+                            </Badge>
+                          ))}
+                        </div>
                         <span className="text-xs text-slate-500">
                           {news.source}
                         </span>
                       </div>
 
-                      {/* Date */}
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(news.published_at)}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-600/50">
+                      {/* Date and Actions */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(news.published_at)}
+                        </div>
+                        
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleLearningStart('chat', news)}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-blue-400"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedNews(news)
+                              setShowLearningOptions(true)
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="p-1 h-8 w-8 text-slate-400 hover:text-blue-400 transition-all duration-200 hover:scale-110"
                           >
                             <MessageSquare className="h-4 w-4" />
                           </Button>
@@ -367,28 +453,13 @@ export default function NewsStockPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleLearningStart('deep-dive', news)}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-green-400"
-                          >
-                            <BookOpen className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleLearningStart('output', news)}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-purple-400"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(news.url, '_blank')}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-blue-400"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              window.open(news.url, '_blank')
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="p-1 h-8 w-8 text-slate-400 hover:text-blue-400 transition-all duration-200 hover:scale-110"
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
@@ -396,17 +467,13 @@ export default function NewsStockPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => downloadNewsAsPDF(news)}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-green-400"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveNews(news.id)}
-                            className="p-1 h-8 w-8 text-slate-400 hover:text-red-400"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleRemoveNews(news.id)
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="p-1 h-8 w-8 text-slate-400 hover:text-red-400 transition-all duration-200 hover:scale-110"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -437,7 +504,58 @@ export default function NewsStockPage() {
               </Button>
             </div>
           )}
+          </div>
         </motion.div>
+
+        {/* Learning Options Modal */}
+        {showLearningOptions && selectedNews && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-md w-full"
+            >
+              <h3 className="text-xl font-semibold text-white mb-4">
+                {isKidsMode ? "べんきょうの しかたを えらぼう" : "学習方法を選択"}
+              </h3>
+              
+              <div className="space-y-3">
+                <Button
+                  onClick={() => handleLearningStart('deep-dive')}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  {isKidsMode ? "ふかく まなぶ" : "深く学ぶ"}
+                </Button>
+                
+                <Button
+                  onClick={() => handleLearningStart('chat')}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  {isKidsMode ? "AIと おしゃべり" : "AIと対話"}
+                </Button>
+                
+                <Button
+                  onClick={() => handleLearningStart('output')}
+                  className="w-full bg-purple-500 hover:bg-purple-600 text-white"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {isKidsMode ? "まとめを つくる" : "まとめを作成"}
+                </Button>
+              </div>
+              
+              <Button
+                variant="ghost"
+                onClick={() => setShowLearningOptions(false)}
+                className="w-full mt-4 text-slate-400 hover:text-white"
+              >
+                {isKidsMode ? "キャンセル" : "キャンセル"}
+              </Button>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   )

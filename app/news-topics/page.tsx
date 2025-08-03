@@ -107,7 +107,7 @@ export default function NewsTopicsPage() {
   const router = useRouter()
   const { selectedNewsTopics, setSelectedNewsTopics, isKidsMode } = useStore()
   const labels = useLabels(isKidsMode)
-  const [selectedTopics, setSelectedTopics] = useState<string[]>(selectedNewsTopics)
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastFetchDates, setLastFetchDates] = useState<Record<string, string | null>>({})
   const [latestNews, setLatestNews] = useState<Record<string, LatestNews>>({})
@@ -129,33 +129,36 @@ export default function NewsTopicsPage() {
     return colors[category] || 'text-slate-300'
   }
 
-  // 各カテゴリーの最新取得日と最新ニュースを取得
+  // ページ読み込み時に選択をクリア
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/latest-news')
-        if (response.ok) {
-          const data = await response.json()
-          setLastFetchDates(data.lastFetchDates || {})
-          setLatestNews(data.latestNews || {})
-        }
-      } catch (error) {
-        console.error('Error fetching latest news data:', error)
-      }
-    }
-
-    fetchData()
+    setSelectedTopics([])
   }, [])
+
+  // 各カテゴリーの最新取得日と最新ニュースを取得（現在は無効化）
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     try {
+  //       const response = await fetch('/api/latest-news')
+  //       if (response.ok) {
+  //         const data = await response.json()
+  //         setLastFetchDates(data.lastFetchDates || {})
+  //         setLatestNews(data.latestNews || {})
+  //       }
+  //     } catch (error) {
+  //       console.error('Error fetching latest news data:', error)
+  //     }
+  //   }
+
+  //   fetchData()
+  // }, [])
 
   const handleTopicToggle = (topicId: string) => {
     setSelectedTopics(prev => {
       if (prev.includes(topicId)) {
         return prev.filter(id => id !== topicId)
       } else {
-        if (prev.length >= 3) {
-          return prev
-        }
-        return [...prev, topicId]
+        // 1つのカテゴリーのみ選択可能
+        return [topicId]
       }
     })
   }
@@ -164,6 +167,10 @@ export default function NewsTopicsPage() {
     if (selectedTopics.length === 0) return
 
     setIsLoading(true)
+    console.log('=== handleContinue called ===')
+    console.log('Setting selected news topics:', selectedTopics)
+    
+    // 先にストアの状態を更新
     setSelectedNewsTopics(selectedTopics)
     setErrorMessage('')
     setProcessingStatus('')
@@ -176,134 +183,142 @@ export default function NewsTopicsPage() {
 
       console.log('Selected topics:', selectedTopics)
 
-      // 各トピックごとに個別にニュースを取得
-      for (let i = 0; i < selectedTopics.length; i++) {
-        const topic = selectedTopics[i]
-        const topicName = isKidsMode 
-          ? labels.categories[topic as keyof typeof labels.categories] || topic
-          : topicNames[topic] || topic
-        
-        setProcessingStatus(`${topicName}のニュースを取得中... (${i + 1}/${selectedTopics.length})`)
-        console.log(`Processing topic ${i + 1}/${selectedTopics.length}: ${topic}`)
-        
-        let retryCount = 0
-        const maxRetries = 3
-        
-        while (retryCount < maxRetries) {
-          try {
-            console.log(`Attempt ${retryCount + 1} for topic ${topic}`)
-            
-            const { data, error } = await supabase.functions.invoke('fetch-news', {
-              body: { topic: topic } // 単一のトピックとして送信
+      // 選択された1つのトピックのニュースを取得
+      const topic = selectedTopics[0] // 最初の（唯一の）選択されたトピック
+      const topicName = isKidsMode 
+        ? labels.categories[topic as keyof typeof labels.categories] || topic
+        : topicNames[topic] || topic
+      
+      setProcessingStatus(`${topicName}のニュースを取得中...`)
+      console.log(`Processing topic: ${topic}`)
+      
+      let retryCount = 0
+      const maxRetries = 3
+      let success = false
+      
+      while (retryCount < maxRetries && !success) {
+        try {
+          console.log(`Attempt ${retryCount + 1} for topic ${topic}`)
+          
+          const { data, error } = await supabase.functions.invoke('fetch-news', {
+            body: { topic: topic } // 単一のトピックとして送信
+          })
+
+          if (error) {
+            console.error(`Supabase function error for topic ${topic} (attempt ${retryCount + 1}):`, error)
+            console.error('Error details:', {
+              message: error.message,
+              name: error.name,
+              status: error.status,
+              statusText: error.statusText,
+              details: error.details,
+              context: error.context,
+              stack: error.stack
             })
-
-            if (error) {
-              console.error(`Supabase function error for topic ${topic} (attempt ${retryCount + 1}):`, error)
-              retryCount++
-              if (retryCount < maxRetries) {
-                setProcessingStatus(`${topicName}のニュース取得を再試行中... (${retryCount}/${maxRetries})`)
-                console.log(`Retrying topic ${topic} in 2 seconds...`)
-                await new Promise(resolve => setTimeout(resolve, 2000))
-                continue
-              } else {
-                console.error(`Failed to fetch news for topic ${topic} after ${maxRetries} attempts`)
-                setErrorMessage(`${topicName}のニュース取得に失敗しました`)
-                break
-              }
-            }
-
-            console.log(`Successfully fetched data for topic ${topic}:`, data)
-
-            if (data && data.articles) {
-              setProcessingStatus(`${topicName}のニュースを保存中...`)
-              // 取得したニュースをデータベースに保存
-              for (const article of data.articles) {
-                try {
-                  const saveResponse = await fetch('/api/saved-news', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      title: article.title,
-                      summary: article.description,
-                      url: article.url,
-                      source: article.source,
-                      category: topic, // 個別のトピックをカテゴリとして設定
-                      publishedAt: article.publishedAt,
-                      topics: [topic] // 単一のトピックのみを設定
-                    }),
-                  }).catch(error => {
-                    // ネットワークエラーの場合は再試行
-                    console.error('Network error saving news:', error)
-                    throw error
-                  })
-
-                  if (saveResponse.ok) {
-                    console.log(`Successfully saved news for topic ${topic}:`, article.title)
-                  } else {
-                    const errorText = await saveResponse.text()
-                    // 409エラー（重複）の場合は無視して続行
-                    if (saveResponse.status !== 409) {
-                      console.error(`Failed to save news for topic ${topic}:`, errorText)
-                      throw new Error(`Save failed with status ${saveResponse.status}: ${errorText}`)
-                    } else {
-                      // 409エラーの場合は静かに処理（コンソールエラーを表示しない）
-                      try {
-                        const errorData = JSON.parse(errorText)
-                        console.log(`News already exists for topic ${topic}:`, article.title)
-                      } catch {
-                        console.log(`News already exists for topic ${topic}:`, article.title)
-                      }
-                    }
-                  }
-                } catch (saveError) {
-                  // 409エラー（重複）の場合は静かに処理
-                  if (saveError instanceof Error && saveError.message?.includes('409')) {
-                    console.log('News already exists, skipping...')
-                  } else {
-                    console.error('Error saving news:', saveError)
-                    // 重複エラー以外は再試行
-                    if (saveError instanceof Error && !saveError.message?.includes('409')) {
-                      throw saveError
-                    }
-                  }
-                }
-              }
-            } else {
-              console.warn(`No articles found for topic ${topic}`)
-            }
             
-            // 成功したらループを抜ける
-            break
-            
-          } catch (topicError) {
-            console.error(`Error processing topic ${topic} (attempt ${retryCount + 1}):`, topicError)
+            // エラーレスポンスの詳細を取得
+            try {
+              const errorResponse = await error.response?.text()
+              console.error('Error response body:', errorResponse)
+            } catch (responseError) {
+              console.error('Could not read error response:', responseError)
+            }
             retryCount++
             if (retryCount < maxRetries) {
-              setProcessingStatus(`${topicName}の処理を再試行中... (${retryCount}/${maxRetries})`)
+              setProcessingStatus(`${topicName}のニュース取得を再試行中... (${retryCount}/${maxRetries})`)
               console.log(`Retrying topic ${topic} in 2 seconds...`)
               await new Promise(resolve => setTimeout(resolve, 2000))
+              continue
             } else {
-              console.error(`Failed to process topic ${topic} after ${maxRetries} attempts`)
-              setErrorMessage(`${topicName}の処理に失敗しました`)
+              console.error(`Failed to fetch news for topic ${topic} after ${maxRetries} attempts`)
+              setErrorMessage(`${topicName}のニュース取得に失敗しました: ${error.message}`)
+              break
             }
+          }
+
+          console.log(`Successfully fetched data for topic ${topic}:`, data)
+
+                      if (data && data.articles) {
+              setProcessingStatus(`${topicName}のニュースを取得中...`)
+              console.log(`Retrieved ${data.articles.length} articles for topic ${topic}`)
+              
+              // データベースの保存を待つ
+              console.log('Waiting for database save...')
+              await new Promise(resolve => setTimeout(resolve, 3000)) // 3秒待機
+              
+              // データベースに保存されているか確認
+              console.log('Checking if articles were saved to database...')
+              try {
+                const checkResponse = await fetch(`/api/latest-news?category=${encodeURIComponent(topic)}`)
+                if (checkResponse.ok) {
+                  const checkData = await checkResponse.json()
+                  console.log(`Database check result: ${checkData.news?.length || 0} articles found in database`)
+                } else {
+                  console.log('Database check failed:', checkResponse.status)
+                }
+              } catch (checkError) {
+                console.error('Error checking database:', checkError)
+              }
+              
+              success = true
+            } else {
+              console.warn(`No articles found for topic ${topic}`)
+              // 記事が見つからない場合でも成功として扱う
+              success = true
+            }
+          
+        } catch (topicError) {
+          console.error(`Error processing topic ${topic} (attempt ${retryCount + 1}):`, topicError)
+          retryCount++
+          if (retryCount < maxRetries) {
+            setProcessingStatus(`${topicName}の処理を再試行中... (${retryCount}/${maxRetries})`)
+            console.log(`Retrying topic ${topic} in 2 seconds...`)
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          } else {
+            console.error(`Failed to process topic ${topic} after ${maxRetries} attempts`)
+            setErrorMessage(`${topicName}の処理に失敗しました`)
+            break
           }
         }
       }
 
-      console.log('All topics processed, redirecting to news dashboard')
-      setProcessingStatus('ニュースダッシュボードに移動中...')
-      
-      // データベースの更新が確実に反映されるように少し待機
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      router.push('/news-dashboard')
+      // 成功した場合のみ遷移
+      if (success) {
+        console.log('News processing completed successfully, redirecting to news dashboard')
+        setProcessingStatus('ニュースダッシュボードに移動中...')
+        
+        // データベースの更新が確実に反映されるように長めに待機
+        console.log('Waiting for database update to complete...')
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        
+        // 最終確認：データベースにニュースが保存されているかチェック
+        console.log('Final database check before redirect...')
+        try {
+          const finalCheckResponse = await fetch(`/api/latest-news?category=${encodeURIComponent(selectedTopics[0])}`)
+          if (finalCheckResponse.ok) {
+            const finalCheckData = await finalCheckResponse.json()
+            console.log(`Final database check: ${finalCheckData.news?.length || 0} articles ready for display`)
+          }
+        } catch (finalCheckError) {
+          console.error('Final database check error:', finalCheckError)
+        }
+        
+        console.log('Redirecting to /news-dashboard...')
+        console.log('Current selected news topics:', selectedTopics)
+        
+        // ストアの状態が確実に更新されるように少し待ってから遷移
+        await new Promise(resolve => setTimeout(resolve, 500))
+        router.replace('/news-dashboard')
+      } else {
+        console.log('News processing failed, not redirecting')
+        setErrorMessage('ニュースの取得に失敗しました。もう一度お試しください。')
+      }
     } catch (error) {
       console.error('Error fetching news:', error)
       setErrorMessage('ニュースの取得中にエラーが発生しました')
     } finally {
       setIsLoading(false)
+      console.log('=== handleContinue completed ===')
     }
   }
 
@@ -351,7 +366,10 @@ export default function NewsTopicsPage() {
               {labels.newsTopics}
             </h1>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              {labels.newsTopicsSubtitle}
+              {isKidsMode 
+                ? "きょうみのある カテゴリーを 1つ えらんでね。6件以上の ニュースを とって、きにいったものは 保存ボタンで のこそう！" 
+                : "Select a category that interests you and let's get the news!"
+              }
             </p>
           </div>
         </div>
@@ -362,8 +380,8 @@ export default function NewsTopicsPage() {
             <Check className="h-5 w-5 text-green-400" />
             <span className="text-white">
               {isKidsMode 
-                ? `${selectedTopics.length}/3 の テーマを えらんだよ` 
-                : `${selectedTopics.length}/3 のテーマを選択中`
+                ? `${selectedTopics.length}/1 の テーマを えらんだよ` 
+                : `${selectedTopics.length}/1 のテーマを選択中`
               }
             </span>
           </div>
@@ -494,11 +512,11 @@ export default function NewsTopicsPage() {
           
           {selectedTopics.length === 0 && (
             <p className="text-slate-400 mt-4">
-              {isKidsMode ? "きょうみのある テーマを えらんでね" : "興味のあるテーマを選択してください"}
+              {isKidsMode ? "きょうみのある テーマを 1つ えらんでね" : "興味のあるテーマを1つ選択してください"}
             </p>
           )}
         </div>
       </div>
     </div>
   )
-} 
+}

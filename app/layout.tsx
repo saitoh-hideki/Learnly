@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" className="dark">
+    <html lang="ja" className="dark" data-scroll-behavior="smooth">
       <body className={`${inter.className} bg-[#0d1117] text-gray-300 min-h-screen`}>
         <div className="flex flex-col min-h-screen">
           {/* Global Navigation */}

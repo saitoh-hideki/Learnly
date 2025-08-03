@@ -192,37 +192,50 @@ export default function DashboardPage() {
             {isKidsMode ? "メインの べんきょうモード" : "メインの学習モード"}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {mainLearningModes.map((mode) => (
-              <Card
-                key={mode.id}
-                className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group"
-                onClick={() => handleModeSelect(mode)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                      <BookOpen className="h-6 w-6 text-blue-400" />
+            {mainLearningModes.map((mode) => {
+              // ニュース学習モードの場合は総保存件数を表示
+              const savedCount = mode.id === 'news-learning' ? savedNewsCount : 0
+              return (
+                <Card
+                  key={mode.id}
+                  className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group"
+                  onClick={() => handleModeSelect(mode)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/20 rounded-lg">
+                        <BookOpen className="h-6 w-6 text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-white text-lg">
+                          {mode.name}
+                        </CardTitle>
+                        <CardDescription className="text-slate-400">
+                          {mode.description}
+                        </CardDescription>
+                      </div>
+                      {/* 保存件数バッジ（ニュース学習モードのみ） */}
+                      {savedCount > 0 && (
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 text-xs px-2 py-1 flex items-center gap-1">
+                            <Bookmark className="h-3 w-3" />
+                            {isKidsMode ? `保存${savedCount}` : `保存${savedCount}`}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <CardTitle className="text-white text-lg">
-                        {mode.name}
-                      </CardTitle>
-                      <CardDescription className="text-slate-400">
-                        {mode.description}
-                      </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
+                        {isKidsMode ? "おすすめ" : "おすすめ"}
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
-                      {isKidsMode ? "おすすめ" : "おすすめ"}
-                    </Badge>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
 
@@ -233,37 +246,49 @@ export default function DashboardPage() {
             {isKidsMode ? "すべての べんきょうモード" : "すべての学習モード"}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredModes.map((mode) => (
-              <Card
-                key={mode.id}
-                className="bg-slate-800/50 border-slate-600 hover:border-green-500 transition-all duration-300 cursor-pointer group"
-                onClick={() => handleModeSelect(mode)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-500/20 rounded-lg">
-                      <BookOpen className="h-5 w-5 text-green-400" />
+            {filteredModes.map((mode) => {
+              const savedCount = categoryNewsCounts[mode.id] || 0
+              return (
+                <Card
+                  key={mode.id}
+                  className="bg-slate-800/50 border-slate-600 hover:border-green-500 transition-all duration-300 cursor-pointer group"
+                  onClick={() => handleModeSelect(mode)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500/20 rounded-lg">
+                        <BookOpen className="h-5 w-5 text-green-400" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className={`text-base ${getCategoryColor(mode.id)}`}>
+                          {mode.name}
+                        </CardTitle>
+                        <CardDescription className="text-slate-400 text-sm">
+                          {mode.description}
+                        </CardDescription>
+                      </div>
+                      {/* 保存件数バッジ */}
+                      {savedCount > 0 && (
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 text-xs px-2 py-1 flex items-center gap-1">
+                            <Bookmark className="h-3 w-3" />
+                            {isKidsMode ? `保存${savedCount}` : `保存${savedCount}`}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <CardTitle className={`text-base ${getCategoryColor(mode.id)}`}>
-                        {mode.name}
-                      </CardTitle>
-                      <CardDescription className="text-slate-400 text-sm">
-                        {mode.description}
-                      </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="bg-green-500/20 text-green-300">
+                        {isKidsMode ? "べんきょう" : "学習"}
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-green-400 transition-colors" />
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" className="bg-green-500/20 text-green-300">
-                      {isKidsMode ? "べんきょう" : "学習"}
-                    </Badge>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-green-400 transition-colors" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
 
@@ -275,37 +300,49 @@ export default function DashboardPage() {
               {isKidsMode ? "さいきんの べんきょう" : "最近の学習"}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentModes.slice(0, 6).map((mode) => (
-                <Card
-                  key={mode.id}
-                  className="bg-slate-800/50 border-slate-600 hover:border-yellow-500 transition-all duration-300 cursor-pointer group"
-                  onClick={() => handleModeSelect(mode)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-yellow-500/20 rounded-lg">
-                        <Check className="h-5 w-5 text-yellow-400" />
+              {recentModes.slice(0, 6).map((mode) => {
+                const savedCount = categoryNewsCounts[mode.id] || 0
+                return (
+                  <Card
+                    key={mode.id}
+                    className="bg-slate-800/50 border-slate-600 hover:border-yellow-500 transition-all duration-300 cursor-pointer group"
+                    onClick={() => handleModeSelect(mode)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-yellow-500/20 rounded-lg">
+                          <Check className="h-5 w-5 text-yellow-400" />
+                        </div>
+                        <div className="flex-1">
+                          <CardTitle className="text-white text-base">
+                            {mode.name}
+                          </CardTitle>
+                          <CardDescription className="text-slate-400 text-sm">
+                            {mode.description}
+                          </CardDescription>
+                        </div>
+                        {/* 保存件数バッジ */}
+                        {savedCount > 0 && (
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 text-xs px-2 py-1 flex items-center gap-1">
+                              <Bookmark className="h-3 w-3" />
+                              {isKidsMode ? `保存${savedCount}` : `保存${savedCount}`}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <CardTitle className="text-white text-base">
-                          {mode.name}
-                        </CardTitle>
-                        <CardDescription className="text-slate-400 text-sm">
-                          {mode.description}
-                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300">
+                          {isKidsMode ? "さいきん" : "最近"}
+                        </Badge>
+                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-yellow-400 transition-colors" />
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300">
-                        {isKidsMode ? "さいきん" : "最近"}
-                      </Badge>
-                      <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-yellow-400 transition-colors" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         )}

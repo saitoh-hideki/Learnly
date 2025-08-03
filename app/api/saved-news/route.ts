@@ -43,8 +43,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log('POST /api/saved-news called')
-    console.log('Supabase URL:', supabaseUrl)
-    console.log('Supabase Anon Key exists:', !!supabaseAnonKey)
     
     const body = await request.json()
     console.log('Request body:', body)
@@ -66,15 +64,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Check result:', { existingNews, checkError })
 
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
-      console.error('Error checking existing news:', checkError)
-      // RLSエラーの場合は、既存チェックをスキップして直接挿入を試行
-      console.log('Skipping existing check due to RLS error, proceeding with insert')
-    }
-
     if (existingNews) {
       console.log('News already exists:', existingNews)
-      // 409エラーの場合は、エラーメッセージをより親切に
       return NextResponse.json({ 
         message: 'News already exists', 
         status: 'duplicate' 
@@ -82,21 +73,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Inserting new news with data:', {
-      user_id: '00000000-0000-0000-0000-000000000000',
       title,
       summary,
       url,
       source,
       category,
-      published_at: publishedAt,
+      publishedAt: publishedAt,
       topics: topics || []
     })
 
-    // Insert new saved news
+    // Insert new saved news (without user_id since RLS is disabled)
     const { data: savedNews, error } = await supabase
       .from('saved_news')
       .insert({
-        user_id: '00000000-0000-0000-0000-000000000000', // プロトタイプ用のダミーユーザーID
         title,
         summary,
         url,
@@ -127,7 +116,30 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const clearAll = searchParams.get('clearAll')
 
+    // すべてのニュースを削除する場合
+    if (clearAll === 'true') {
+      console.log('Clearing all saved news')
+      
+      // すべてのレコードを削除
+      const { error } = await supabase
+        .from('saved_news')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000') // すべてのレコードを削除
+
+      if (error) {
+        console.error('Error clearing all saved news:', error)
+        return NextResponse.json({ error: 'Failed to clear all saved news' }, { status: 500 })
+      }
+
+      console.log('Successfully cleared all saved news')
+      return NextResponse.json({ 
+        message: 'All saved news cleared successfully'
+      })
+    }
+
+    // 特定のニュースを削除する場合
     if (!id) {
       return NextResponse.json({ error: 'News ID is required' }, { status: 400 })
     }

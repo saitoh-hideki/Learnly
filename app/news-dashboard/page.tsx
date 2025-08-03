@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Search, Filter, Calendar, ExternalLink, MessageSquare, BookOpen, FileText, RefreshCw, Settings, Bookmark, Eye, EyeOff, ChevronDown, ChevronUp, Sparkles, Archive, Zap, Target, TrendingUp, Clock } from 'lucide-react'
+import { ArrowLeft, Search, Calendar, ExternalLink, MessageSquare, BookOpen, FileText, RefreshCw, Bookmark, Sparkles } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,22 +54,6 @@ const cardHoverVariants = {
   }
 }
 
-// 空のニュースデータ（ダミーデータを削除）
-const dummyNews: NewsArticle[] = []
-
-const categories = [
-  { id: 'all', name: 'すべて', icon: '📰' },
-  { id: 'business', name: 'ビジネス・経営', icon: '💼' },
-  { id: 'technology', name: 'テクノロジー・IT', icon: '💻' },
-  { id: 'economics', name: '経済・金融', icon: '📊' },
-  { id: 'science', name: '科学・研究', icon: '🔬' },
-  { id: 'education', name: '教育・学習', icon: '📚' },
-  { id: 'health', name: '健康・医療', icon: '🏥' },
-  { id: 'environment', name: '環境・サステナビリティ', icon: '🌱' },
-  { id: 'society', name: '社会・政治', icon: '🏛️' },
-  { id: 'lifestyle', name: '文化・ライフスタイル', icon: '🌟' }
-]
-
 const topicNames: { [key: string]: string } = {
   'business': 'ビジネス・経営',
   'technology': 'テクノロジー・IT',
@@ -84,25 +68,47 @@ const topicNames: { [key: string]: string } = {
 
 export default function NewsDashboardPage() {
   const router = useRouter()
-  const { selectedNewsTopics, isKidsMode } = useStore()
+  const { selectedNewsTopics, setSelectedNewsTopics, isKidsMode } = useStore()
   const labels = useLabels(isKidsMode)
   const [news, setNews] = useState<NewsArticle[]>([])
-  const [filteredNews, setFilteredNews] = useState<NewsArticle[]>([])
-  const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [savedNewsIds, setSavedNewsIds] = useState<Set<string>>(new Set())
-  const [showFilters, setShowFilters] = useState(false)
   const [selectedNews, setSelectedNews] = useState<NewsArticle | null>(null)
   const [showLearningOptions, setShowLearningOptions] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [savingNewsIds, setSavingNewsIds] = useState<Set<string>>(new Set())
+
+  // デバッグ用：コンポーネント初期化時の状態をログ
+  useEffect(() => {
+    console.log('=== NewsDashboardPage initialized ===')
+    console.log('Selected news topics:', selectedNewsTopics)
+    console.log('Selected news topics length:', selectedNewsTopics.length)
+    console.log('Is kids mode:', isKidsMode)
+    console.log('Labels:', labels)
+  }, [selectedNewsTopics, isKidsMode, labels])
 
   // ニュースデータを取得
-  const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
     try {
       setIsLoading(true)
-      console.log('Fetching news from /api/latest-news...')
-      const response = await fetch('/api/latest-news')
+      console.log('=== fetchNews called ===')
+      console.log('Selected news topics:', selectedNewsTopics)
+      console.log('Selected news topics length:', selectedNewsTopics.length)
+      
+      // 選択されたカテゴリーを取得
+      const selectedCategory = selectedNewsTopics[0]
+      if (!selectedCategory) {
+        console.log('No category selected, showing empty state')
+        setNews([])
+        return
+      }
+      
+      console.log('Fetching news for category:', selectedCategory)
+      const apiUrl = `/api/latest-news?category=${encodeURIComponent(selectedCategory)}`
+      console.log('API URL:', apiUrl)
+      
+      const response = await fetch(apiUrl)
       console.log('Response status:', response.status)
       
       if (response.ok) {
@@ -110,34 +116,40 @@ export default function NewsDashboardPage() {
         console.log('Raw API response:', data)
         console.log('News count from API:', data.news?.length || 0)
         
-        // データベースの形式をNewsArticle型に変換
-        const formattedNews = (data.news || []).map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          summary: item.summary,
-          url: item.url,
-          source: item.source,
-          category: item.category,
-          publishedAt: item.published_at,
-          topics: item.topics || [item.category], // topicsフィールドを使用
-          createdAt: new Date(item.created_at)
-        }))
-        
-        console.log('Formatted news count:', formattedNews.length)
-        console.log('Formatted news:', formattedNews)
-        
-        // 作成日時で降順にソート（最新のものが上に来る）
-        const sortedNews = formattedNews.sort((a: NewsArticle, b: NewsArticle) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        
-        console.log('Sorted news count:', sortedNews.length)
-        console.log('Top 3 news items:', sortedNews.slice(0, 3))
-        
-        setNews(sortedNews)
+        if (data.news && Array.isArray(data.news)) {
+          // データベースの形式をNewsArticle型に変換
+          const formattedNews = data.news.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            summary: item.summary,
+            url: item.url,
+            source: item.source,
+            category: item.category,
+            publishedAt: item.published_at,
+            topics: item.topics || [item.category],
+            createdAt: new Date(item.created_at)
+          }))
+          
+          console.log('Formatted news count:', formattedNews.length)
+          console.log('Formatted news sample:', formattedNews.slice(0, 2))
+          
+          // 作成日時で降順にソート（最新のものが上に来る）
+          const sortedNews = formattedNews.sort((a: NewsArticle, b: NewsArticle) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          
+          console.log('Sorted news count:', sortedNews.length)
+          console.log('Top 3 news items:', sortedNews.slice(0, 3))
+          
+          setNews(sortedNews)
+        } else {
+          console.warn('No news data in response or invalid format')
+          setNews([])
+        }
       } else {
         console.error('API response not ok:', response.status, response.statusText)
-        // エラー時は空の配列を使用
+        const errorText = await response.text()
+        console.error('Error response body:', errorText)
         setNews([])
       }
     } catch (error) {
@@ -146,8 +158,9 @@ export default function NewsDashboardPage() {
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
+      console.log('=== fetchNews completed ===')
     }
-  }
+  }, [selectedNewsTopics])
 
   // 手動でニュースを再取得
   const handleRefreshNews = async () => {
@@ -155,42 +168,96 @@ export default function NewsDashboardPage() {
     await fetchNews()
   }
 
-  // 初回読み込み時に少し待ってから再取得（データベースの更新を確実に反映）
+  // 初回読み込み時にニュースを取得
   useEffect(() => {
-    fetchNews()
+    console.log('=== useEffect for news fetching ===')
+    console.log('Selected news topics:', selectedNewsTopics)
+    console.log('Selected news topics length:', selectedNewsTopics.length)
+    
+    // 選択されたカテゴリーがある場合のみニュースを取得
+    if (selectedNewsTopics.length > 0) {
+      console.log('Selected news topics found, fetching news...')
+      // 少し待ってから取得（データベースの更新を確実に反映）
+      const timer = setTimeout(() => {
+        fetchNews()
+      }, 1000)
+      
+      return () => clearTimeout(timer)
+    } else {
+      console.log('No news topics selected, setting empty state')
+      setNews([])
+    }
 
-    // 5分ごとにニュースを更新
-    const interval = setInterval(fetchNews, 5 * 60 * 1000)
+    // 5分ごとにニュースを更新（選択されたカテゴリーがある場合のみ）
+    const interval = setInterval(() => {
+      if (selectedNewsTopics.length > 0) {
+        console.log('Auto-refreshing news...')
+        fetchNews()
+      }
+    }, 5 * 60 * 1000)
 
     return () => {
       clearInterval(interval)
     }
-  }, []) // fetchNewsは関数なので依存関係に含めない
+  }, [selectedNewsTopics, fetchNews])
 
   // 保存済みニュースのIDを取得
   useEffect(() => {
     fetchSavedNewsIds()
   }, [])
 
-  // ニュースをフィルタリング
+  // ニュースデータが更新されたら保存済みIDも再取得
   useEffect(() => {
+    if (news.length > 0) {
+      fetchSavedNewsIds()
+    }
+  }, [news.length])
+
+  // デバッグ用：保存済みIDの状態を監視
+  useEffect(() => {
+    console.log('Current saved news IDs:', Array.from(savedNewsIds))
+  }, [savedNewsIds])
+
+  // ニュースをフィルタリング（検索クエリに基づく）
+  const filteredNews = useCallback(() => {
+    console.log('=== Filtering news ===')
+    console.log('Original news count:', news.length)
+    console.log('Selected news topics:', selectedNewsTopics)
+    console.log('Search query:', searchQuery)
+    
     let filtered = news
 
     // カテゴリフィルター
-    if (selectedCategory !== 'all') {
+    if (selectedNewsTopics.length > 0) {
+      const selectedCategory = selectedNewsTopics[0]
+      console.log('Filtering by category:', selectedCategory)
       filtered = filtered.filter(item => item.category === selectedCategory)
+      console.log('After category filter:', filtered.length)
     }
 
     // 検索フィルター
-    if (searchQuery) {
+    if (searchQuery.trim()) {
+      console.log('Filtering by search query:', searchQuery)
+      const query = searchQuery.toLowerCase().trim()
       filtered = filtered.filter(item =>
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.summary.toLowerCase().includes(searchQuery.toLowerCase())
+        item.title.toLowerCase().includes(query) ||
+        item.summary.toLowerCase().includes(query)
       )
+      console.log('After search filter:', filtered.length)
     }
 
-    setFilteredNews(filtered)
-  }, [news, selectedCategory, searchQuery])
+    console.log('Final filtered news count:', filtered.length)
+    return filtered
+  }, [news, selectedNewsTopics, searchQuery])
+
+  // フィルタリングされたニュースを取得
+  const currentFilteredNews = filteredNews()
+
+  // デバッグ用：ニュースデータの状態を監視
+  useEffect(() => {
+    console.log('Current news count:', news.length)
+    console.log('Current filtered news count:', currentFilteredNews.length)
+  }, [news, currentFilteredNews])
 
   const handleNewsSelect = (news: NewsArticle) => {
     setSelectedNews(news)
@@ -209,6 +276,14 @@ export default function NewsDashboardPage() {
   }
 
   const handleSaveNews = async (news: NewsArticle) => {
+    // 既に保存済みの場合は何もしない
+    if (savedNewsIds.has(news.id)) {
+      return
+    }
+
+    // 保存中の状態を設定
+    setSavingNewsIds(prev => new Set([...prev, news.id]))
+
     try {
       const response = await fetch('/api/saved-news', {
         method: 'POST',
@@ -222,16 +297,38 @@ export default function NewsDashboardPage() {
           source: news.source,
           category: news.category,
           publishedAt: news.publishedAt,
-          topics: news.topics || [news.category] // topicsフィールドを正しく送信
+          topics: news.topics || [news.category]
         }),
       })
 
       if (response.ok) {
         // 保存済みニュースのIDを更新
         setSavedNewsIds(prev => new Set([...prev, news.id]))
+        console.log('News saved successfully:', news.title)
+        
+        // 保存成功のフィードバック（3秒後に自動で消える）
+        const successMessage = isKidsMode ? 'とっておいたよ！' : '保存しました！'
+        // ここでトースト通知を表示するか、一時的なメッセージを表示
+        setTimeout(() => {
+          // 保存成功の視覚的フィードバックを消す
+        }, 3000)
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to save news:', errorText)
+        // エラーメッセージを表示
+        const errorMessage = isKidsMode ? 'とっておきに しっぱいしたよ' : '保存に失敗しました'
       }
     } catch (error) {
       console.error('Error saving news:', error)
+      // エラーメッセージを表示
+      const errorMessage = isKidsMode ? 'とっておきに しっぱいしたよ' : '保存に失敗しました'
+    } finally {
+      // 保存中の状態を解除
+      setSavingNewsIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(news.id)
+        return newSet
+      })
     }
   }
 
@@ -242,6 +339,9 @@ export default function NewsDashboardPage() {
         const data = await response.json()
         const savedIds = new Set<string>(data.savedNews?.map((item: any) => item.id as string) || [])
         setSavedNewsIds(savedIds)
+        console.log('Fetched saved news IDs:', Array.from(savedIds))
+      } else {
+        console.error('Failed to fetch saved news IDs:', response.status)
       }
     } catch (error) {
       console.error('Error fetching saved news IDs:', error)
@@ -289,7 +389,7 @@ export default function NewsDashboardPage() {
         <div className="mb-8">
           <Button
             variant="ghost"
-            onClick={() => router.back()}
+            onClick={() => router.push('/news-topics')}
             className="text-slate-300 hover:text-white mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -302,7 +402,10 @@ export default function NewsDashboardPage() {
               {labels.newsLearning}
             </h1>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              {labels.newsLearningSubtitle}
+              {isKidsMode 
+                ? "えらんだ カテゴリーの さいきんの ニュースを みて、きにいったものは 保存ボタンで とっておこう！" 
+                : "Select the latest news from your chosen category and start learning! Save interesting articles with the bookmark button."
+              }
             </p>
           </div>
         </div>
@@ -330,49 +433,7 @@ export default function NewsDashboardPage() {
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isKidsMode ? "更新" : "更新"}
             </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-              className="border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300"
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              {isKidsMode ? "フィルター" : "フィルター"}
-              {showFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
-            </Button>
           </div>
-
-          {/* Category Filters */}
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 p-4 bg-slate-800/50 border border-slate-600 rounded-lg"
-            >
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`${
-                      selectedCategory === category.id
-                        ? 'bg-blue-500 text-white'
-                        : 'border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300'
-                    }`}
-                  >
-                    <span className="mr-1">{category.icon}</span>
-                    {isKidsMode 
-                      ? (category.id === 'all' ? 'すべて' : labels.categories[category.id as keyof typeof labels.categories] || category.name)
-                      : category.name
-                    }
-                  </Button>
-                ))}
-              </div>
-            </motion.div>
-          )}
         </div>
 
         {/* News Grid */}
@@ -380,19 +441,49 @@ export default function NewsDashboardPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
+          className="max-h-[75vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
         >
-          {/* 上段3つのニュースの説明 */}
-          {filteredNews.length > 0 && (
-            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <div className="flex items-center gap-2 text-blue-300 text-sm">
-                <Sparkles className="h-4 w-4" />
-                <span>
-                  {isKidsMode 
-                    ? "うえの 3つの ニュースが さいきん えらばれた テーマの ニュースだよ！" 
-                    : "上段3つのニュースが最新の選択テーマのニュースです"
-                  }
-                </span>
+          {/* 選択されたカテゴリーの情報 */}
+          {selectedNewsTopics.length > 0 && (
+            <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="flex items-center gap-3 text-blue-300">
+                <Sparkles className="h-5 w-5" />
+                <div>
+                  <h3 className="font-semibold">
+                    {isKidsMode 
+                      ? `えらんだ カテゴリー「${labels.categories[selectedNewsTopics[0] as keyof typeof labels.categories] || selectedNewsTopics[0]}」の さいきんの ニュース` 
+                      : `選択したカテゴリー「${topicNames[selectedNewsTopics[0]] || selectedNewsTopics[0]}」の最新ニュース`
+                    }
+                  </h3>
+                  <p className="text-sm text-blue-200">
+                    {isLoading 
+                      ? (isKidsMode ? "ニュースを よみこみちゅう..." : "ニュースを読み込み中...")
+                      : searchQuery.trim()
+                        ? (isKidsMode 
+                            ? `「${searchQuery}」で さがした けっか：${currentFilteredNews.length}件の ニュース` 
+                            : `「${searchQuery}」で検索した結果：${currentFilteredNews.length}件のニュース`
+                          )
+                        : (isKidsMode 
+                            ? `${currentFilteredNews.length}件の さいきんの ニュースが あるよ（きにいったものは 保存ボタンで とっておこう）` 
+                            : `${currentFilteredNews.length}件の最新ニュースがあります（気に入ったものは保存ボタンで保存できます）`
+                          )
+                    }
+                  </p>
+                  {!isLoading && currentFilteredNews.length === 0 && (
+                    <p className="text-sm text-yellow-200 mt-1">
+                      {searchQuery.trim()
+                        ? (isKidsMode 
+                            ? `「${searchQuery}」に あう ニュースが ないよ。ちがう ことばで さがしてみてね！` 
+                            : `「${searchQuery}」に一致するニュースがありません。別のキーワードで検索してみてください。`
+                          )
+                        : (isKidsMode 
+                            ? "この カテゴリーには まだ さいきんの ニュースが ないよ。しばらく まってから もう一度 ためしてみてね！" 
+                            : "このカテゴリーにはまだ最新ニュースがありません。しばらく待ってからもう一度お試しください。"
+                          )
+                      }
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -415,26 +506,18 @@ export default function NewsDashboardPage() {
                   </CardContent>
                 </Card>
               ))
-            ) : filteredNews.length > 0 ? (
-              filteredNews.map((newsItem, index) => (
+            ) : currentFilteredNews.length > 0 ? (
+              currentFilteredNews.map((newsItem, index) => (
                 <motion.div
                   key={newsItem.id}
                   variants={itemVariants}
                   whileHover="hover"
                   initial="rest"
                   animate="rest"
-                  className={index < 3 ? "relative" : ""}
                 >
-                  {/* 上段3つのニュースには特別なスタイルを適用 */}
-                  {index < 3 && (
-                    <div className="absolute -top-2 -left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center z-10">
-                      <span className="text-white text-xs font-bold">{index + 1}</span>
-                    </div>
-                  )}
-                  
                   <Card
                     className={`bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group h-full flex flex-col hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 ${
-                      index < 3 ? "ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20" : ""
+                      savedNewsIds.has(newsItem.id) ? 'ring-2 ring-green-500/30 shadow-lg shadow-green-500/20' : ''
                     }`}
                     onClick={() => handleNewsSelect(newsItem)}
                   >
@@ -499,16 +582,32 @@ export default function NewsDashboardPage() {
                               variant="ghost"
                               size="sm"
                               onClick={(e) => {
+                                e.preventDefault()
                                 e.stopPropagation()
                                 handleSaveNews(newsItem)
                               }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              disabled={savingNewsIds.has(newsItem.id)}
                               className={`p-1 h-8 w-8 transition-all duration-200 hover:scale-110 ${
                                 savedNewsIds.has(newsItem.id)
-                                  ? 'text-yellow-400 hover:text-yellow-300'
+                                  ? 'text-green-400 hover:text-green-300'
+                                  : savingNewsIds.has(newsItem.id)
+                                  ? 'text-blue-400'
                                   : 'text-slate-400 hover:text-yellow-400'
                               }`}
+                              title={
+                                savedNewsIds.has(newsItem.id)
+                                  ? (isKidsMode ? 'とっておき済み' : '保存済み')
+                                  : savingNewsIds.has(newsItem.id)
+                                  ? (isKidsMode ? 'とっておき中...' : '保存中...')
+                                  : (isKidsMode ? 'とっておきする' : '保存する')
+                              }
                             >
-                              <Bookmark className="h-4 w-4" />
+                              {savingNewsIds.has(newsItem.id) ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                              ) : (
+                                <Bookmark className={`h-4 w-4 ${savedNewsIds.has(newsItem.id) ? 'fill-current' : ''}`} />
+                              )}
                             </Button>
                             
                             <Button
@@ -536,9 +635,20 @@ export default function NewsDashboardPage() {
                   <Search className="h-8 w-8 text-slate-400" />
                 </div>
                 <p className="text-slate-400 text-lg mb-4">
-                  {isKidsMode 
-                    ? "ニュースが まだ ないよ。ニューストピックで えらんでね！" 
-                    : "ニュースがまだありません。ニューストピックで選択してください"
+                  {selectedNewsTopics.length === 0 
+                    ? (isKidsMode 
+                        ? "カテゴリーが えらばれていないよ。ニューストピックで カテゴリーを えらんでね！" 
+                        : "カテゴリーが選択されていません。ニューストピックでカテゴリーを選択してください"
+                      )
+                    : searchQuery.trim()
+                      ? (isKidsMode 
+                          ? `「${searchQuery}」に あう ニュースが ないよ。ちがう ことばで さがしてみてね！` 
+                          : `「${searchQuery}」に一致するニュースがありません。別のキーワードで検索してみてください。`
+                        )
+                      : (isKidsMode 
+                          ? "この カテゴリーには まだ さいきんの ニュースが ないよ。しばらく まってから もう一度 ためしてみてね！" 
+                          : "このカテゴリーにはまだ最新ニュースがありません。しばらく待ってからもう一度お試しください。"
+                        )
                   }
                 </p>
                 <Button
@@ -605,4 +715,4 @@ export default function NewsDashboardPage() {
       </div>
     </div>
   )
-} 
+}
