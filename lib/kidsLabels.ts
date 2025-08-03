@@ -100,7 +100,7 @@ export interface Labels {
 export const normalLabels: Labels = {
   startLearning: "学習を始める",
   dashboardTitle: "学習モードを選択",
-  dashboardSubtitle: "AIと共に学びを深め、自らの言葉で振り返る力を育む",
+  dashboardSubtitle: "Building intelligence through information from a changing world - a new form of learning",
   
   hero: {
     title: "AIと共に学びを深める",
@@ -188,7 +188,7 @@ export const normalLabels: Labels = {
 export const kidsLabels: Labels = {
   startLearning: "べんきょうを スタート！",
   dashboardTitle: "テーマを えらぼう",
-  dashboardSubtitle: "AIと いっしょに まなんで、じぶんの ことばで かんがえよう",
+  dashboardSubtitle: "Building intelligence through information from a changing world - a new form of learning",
   
   hero: {
     title: "AIと いっしょに まなぼう！",
