@@ -509,47 +509,55 @@ export default function NewsStockPage() {
 
         {/* Learning Options Modal */}
         {showLearningOptions && selectedNews && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-md w-full"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-slate-800/95 border border-slate-600/50 rounded-xl shadow-2xl p-6 max-w-md w-full backdrop-blur-sm"
             >
-              <h3 className="text-xl font-semibold text-white mb-4">
-                {isKidsMode ? "べんきょうの しかたを えらぼう" : "学習方法を選択"}
-              </h3>
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Sparkles className="h-6 w-6 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white">
+                  {isKidsMode ? "べんきょうの しかたを えらぼう" : "学習方法を選択"}
+                </h3>
+                <p className="text-sm text-slate-400 mt-2">
+                  {isKidsMode ? "あなたに ぴったりの 学習方法を えらんでね" : "Choose the learning method that suits you best"}
+                </p>
+              </div>
               
               <div className="space-y-3">
                 <Button
                   onClick={() => handleLearningStart('deep-dive')}
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/25 border border-blue-400/20"
                 >
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  {isKidsMode ? "ふかく まなぶ" : "深く学ぶ"}
+                  <BookOpen className="h-5 w-5 mr-3" />
+                  {isKidsMode ? "Deep Review" : "Deep Review"}
                 </Button>
                 
                 <Button
                   onClick={() => handleLearningStart('chat')}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 border border-purple-400/20"
                 >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  {isKidsMode ? "AIと おしゃべり" : "AIと対話"}
+                  <MessageSquare className="h-5 w-5 mr-3" />
+                  {isKidsMode ? "Discussion" : "Discussion"}
                 </Button>
                 
                 <Button
                   onClick={() => handleLearningStart('output')}
-                  className="w-full bg-purple-500 hover:bg-purple-600 text-white"
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/25 border border-emerald-400/20"
                 >
-                  <FileText className="h-4 w-4 mr-2" />
-                  {isKidsMode ? "まとめを つくる" : "まとめを作成"}
+                  <FileText className="h-5 w-5 mr-3" />
+                  {isKidsMode ? "Action" : "Action"}
                 </Button>
               </div>
               
               <Button
                 variant="ghost"
                 onClick={() => setShowLearningOptions(false)}
-                className="w-full mt-4 text-slate-400 hover:text-white"
+                className="w-full mt-6 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
               >
                 {isKidsMode ? "キャンセル" : "キャンセル"}
               </Button>
