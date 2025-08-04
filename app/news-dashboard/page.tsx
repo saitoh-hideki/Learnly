@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Search, Calendar, ExternalLink, MessageSquare, BookOpen, FileText, RefreshCw, Bookmark, Sparkles } from 'lucide-react'
+import { ArrowLeft, Search, Calendar, ExternalLink, MessageSquare, BookOpen, FileText, RefreshCw, Bookmark, Sparkles, Plus } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -168,6 +168,55 @@ export default function NewsDashboardPage() {
     await fetchNews()
   }
 
+  // 新しいニュースをPerplexityから取得
+  const handleFetchNewNews = async () => {
+    try {
+      setIsRefreshing(true)
+      console.log('=== Fetching new news from Perplexity ===')
+      
+      // 選択されたカテゴリーを取得
+      const selectedCategory = selectedNewsTopics[0]
+      if (!selectedCategory) {
+        console.log('No category selected for new news fetch')
+        return
+      }
+      
+      console.log('Fetching new news for category:', selectedCategory)
+      
+      // Perplexityから新しいニュースを取得
+      const response = await fetch('/api/fetch-news', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: selectedCategory
+        })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        console.log('New news fetch result:', result)
+        
+        // 新しいニュースを取得したら、既存のニュースを再取得
+        setTimeout(() => {
+          fetchNews()
+        }, 2000) // 2秒待ってから既存ニュースを再取得
+        
+        alert(`${selectedCategory}カテゴリの新しいニュースを取得しました！`)
+      } else {
+        const errorText = await response.text()
+        console.error('Failed to fetch new news:', errorText)
+        alert('新しいニュースの取得に失敗しました。')
+      }
+    } catch (error) {
+      console.error('Error fetching new news:', error)
+      alert('新しいニュースの取得中にエラーが発生しました。')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   // 初回読み込み時にニュースを取得
   useEffect(() => {
     console.log('=== useEffect for news fetching ===')
@@ -184,8 +233,42 @@ export default function NewsDashboardPage() {
       
       return () => clearTimeout(timer)
     } else {
-      console.log('No news topics selected, setting empty state')
-      setNews([])
+      console.log('No news topics selected, fetching default news...')
+      // デフォルトのニュースを取得（technologyカテゴリー）
+      const fetchDefaultNews = async () => {
+        try {
+          setIsLoading(true)
+          const response = await fetch('/api/latest-news?category=technology')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.news && Array.isArray(data.news)) {
+              const formattedNews = data.news.map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                summary: item.summary,
+                url: item.url,
+                source: item.source,
+                category: item.category,
+                publishedAt: item.published_at,
+                topics: item.topics || [item.category],
+                createdAt: new Date(item.created_at)
+              }))
+              setNews(formattedNews)
+            } else {
+              setNews([])
+            }
+          } else {
+            setNews([])
+          }
+        } catch (error) {
+          console.error('Error fetching default news:', error)
+          setNews([])
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      
+      fetchDefaultNews()
     }
 
     // 5分ごとにニュースを更新（選択されたカテゴリーがある場合のみ）
@@ -267,22 +350,26 @@ export default function NewsDashboardPage() {
   const handleLearningStart = (action: 'deep-dive' | 'chat' | 'output') => {
     if (!selectedNews) return
 
-    // 選択されたニュースをセッションストレージに保存
-    sessionStorage.setItem('selectedNews', JSON.stringify(selectedNews))
-    sessionStorage.setItem('learningAction', action)
-
-    // チャットページに遷移
-    router.push('/chat/news-learning')
+    if (action === 'deep-dive') {
+      // Deep Reviewページに遷移
+      router.push(`/deep-review?newsId=${selectedNews.id}`)
+    } else if (action === 'chat') {
+      // Discussionページに遷移
+      router.push(`/chat/discussion?newsId=${selectedNews.id}`)
+    } else if (action === 'output') {
+      // Actionページに遷移
+      router.push(`/chat/action?newsId=${selectedNews.id}`)
+    }
   }
 
   const handleSaveNews = async (news: NewsArticle) => {
     // 既に保存済みの場合は何もしない
-    if (savedNewsIds.has(news.id)) {
+    if (savedNewsIds.has(news.url)) {
       return
     }
 
     // 保存中の状態を設定
-    setSavingNewsIds(prev => new Set([...prev, news.id]))
+    setSavingNewsIds(prev => new Set([...prev, news.url]))
 
     try {
       const response = await fetch('/api/saved-news', {
@@ -302,8 +389,8 @@ export default function NewsDashboardPage() {
       })
 
       if (response.ok) {
-        // 保存済みニュースのIDを更新
-        setSavedNewsIds(prev => new Set([...prev, news.id]))
+        // 保存済みニュースのURLを更新
+        setSavedNewsIds(prev => new Set([...prev, news.url]))
         console.log('News saved successfully:', news.title)
         
         // 保存成功のフィードバック（3秒後に自動で消える）
@@ -312,6 +399,14 @@ export default function NewsDashboardPage() {
         setTimeout(() => {
           // 保存成功の視覚的フィードバックを消す
         }, 3000)
+      } else if (response.status === 409) {
+        // 409エラー（重複）の場合は、既に保存済みとして扱う
+        setSavedNewsIds(prev => new Set([...prev, news.url]))
+        console.log('News already exists, treating as saved:', news.title)
+        
+        // 既に保存済みのメッセージ
+        const alreadySavedMessage = isKidsMode ? 'もう とっておいてあるよ！' : '既に保存済みです'
+        // ここでトースト通知を表示するか、一時的なメッセージを表示
       } else {
         const errorText = await response.text()
         console.error('Failed to save news:', errorText)
@@ -326,7 +421,7 @@ export default function NewsDashboardPage() {
       // 保存中の状態を解除
       setSavingNewsIds(prev => {
         const newSet = new Set(prev)
-        newSet.delete(news.id)
+        newSet.delete(news.url)
         return newSet
       })
     }
@@ -337,9 +432,10 @@ export default function NewsDashboardPage() {
       const response = await fetch('/api/saved-news')
       if (response.ok) {
         const data = await response.json()
-        const savedIds = new Set<string>(data.savedNews?.map((item: any) => item.id as string) || [])
-        setSavedNewsIds(savedIds)
-        console.log('Fetched saved news IDs:', Array.from(savedIds))
+        // URLベースで保存済みニュースを判定
+        const savedUrls = new Set<string>(data.savedNews?.map((item: any) => item.url as string) || [])
+        setSavedNewsIds(savedUrls)
+        console.log('Fetched saved news URLs:', Array.from(savedUrls))
       } else {
         console.error('Failed to fetch saved news IDs:', response.status)
       }
@@ -366,10 +462,9 @@ export default function NewsDashboardPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     })
   }
 
@@ -424,15 +519,27 @@ export default function NewsDashboardPage() {
               />
             </div>
             
-            <Button
-              variant="outline"
-              onClick={handleRefreshNews}
-              disabled={isRefreshing}
-              className="border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isKidsMode ? "更新" : "更新"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRefreshNews}
+                disabled={isRefreshing}
+                className="border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isKidsMode ? "更新" : "更新"}
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={handleFetchNewNews}
+                disabled={isRefreshing}
+                className="border-green-600 text-green-300 hover:border-green-500 hover:text-green-300"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isKidsMode ? "新しいニュース" : "新しいニュース"}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -517,7 +624,7 @@ export default function NewsDashboardPage() {
                 >
                   <Card
                     className={`bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group h-full flex flex-col hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 ${
-                      savedNewsIds.has(newsItem.id) ? 'ring-2 ring-green-500/30 shadow-lg shadow-green-500/20' : ''
+                      savedNewsIds.has(newsItem.url) ? 'ring-2 ring-green-500/30 shadow-lg shadow-green-500/20' : ''
                     }`}
                     onClick={() => handleNewsSelect(newsItem)}
                   >
@@ -565,9 +672,11 @@ export default function NewsDashboardPage() {
                               </Badge>
                             ))}
                           </div>
-                          <span className="text-xs text-slate-500">
-                            {newsItem.source}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500">
+                              {newsItem.source}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Date and Actions */}
@@ -587,26 +696,26 @@ export default function NewsDashboardPage() {
                                 handleSaveNews(newsItem)
                               }}
                               onMouseDown={(e) => e.stopPropagation()}
-                              disabled={savingNewsIds.has(newsItem.id)}
+                              disabled={savingNewsIds.has(newsItem.url)}
                               className={`p-1 h-8 w-8 transition-all duration-200 hover:scale-110 ${
-                                savedNewsIds.has(newsItem.id)
+                                savedNewsIds.has(newsItem.url)
                                   ? 'text-green-400 hover:text-green-300'
-                                  : savingNewsIds.has(newsItem.id)
+                                  : savingNewsIds.has(newsItem.url)
                                   ? 'text-blue-400'
                                   : 'text-slate-400 hover:text-yellow-400'
                               }`}
                               title={
-                                savedNewsIds.has(newsItem.id)
+                                savedNewsIds.has(newsItem.url)
                                   ? (isKidsMode ? 'とっておき済み' : '保存済み')
-                                  : savingNewsIds.has(newsItem.id)
+                                  : savingNewsIds.has(newsItem.url)
                                   ? (isKidsMode ? 'とっておき中...' : '保存中...')
                                   : (isKidsMode ? 'とっておきする' : '保存する')
                               }
                             >
-                              {savingNewsIds.has(newsItem.id) ? (
+                              {savingNewsIds.has(newsItem.url) ? (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
                               ) : (
-                                <Bookmark className={`h-4 w-4 ${savedNewsIds.has(newsItem.id) ? 'fill-current' : ''}`} />
+                                <Bookmark className={`h-4 w-4 ${savedNewsIds.has(newsItem.url) ? 'fill-current' : ''}`} />
                               )}
                             </Button>
                             
@@ -665,55 +774,85 @@ export default function NewsDashboardPage() {
 
         {/* Learning Options Modal */}
         {showLearningOptions && selectedNews && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-800/95 border border-slate-600/50 rounded-xl shadow-2xl p-6 max-w-md w-full backdrop-blur-sm"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-slate-800 border border-slate-600 rounded-xl shadow-xl p-6 max-w-md w-full"
             >
               <div className="text-center mb-6">
-                <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Sparkles className="h-6 w-6 text-blue-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-white">
+                <h3 className="text-xl font-semibold text-white mb-2">
                   {isKidsMode ? "べんきょうの しかたを えらぼう" : "学習方法を選択"}
                 </h3>
-                <p className="text-sm text-slate-400 mt-2">
-                  {isKidsMode ? "あなたに ぴったりの 学習方法を えらんでね" : "Choose the learning method that suits you best"}
+                <p className="text-sm text-slate-400">
+                  {isKidsMode ? "ニュースを えらんで べんきょうしよう" : "ニュースを選んで学習を始めましょう"}
                 </p>
               </div>
               
-              <div className="space-y-3">
-                <Button
+              <div className="space-y-4">
+                <button
                   onClick={() => handleLearningStart('deep-dive')}
-                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/25 border border-blue-400/20"
+                  className="w-full p-4 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 transition-opacity text-left"
                 >
-                  <BookOpen className="h-5 w-5 mr-3" />
-                  {isKidsMode ? "Deep Review" : "Deep Review"}
-                </Button>
-                
-                <Button
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        Deep Review
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        ニュースの要約と関連情報を収集して多面的に深く理解
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => handleLearningStart('chat')}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 border border-purple-400/20"
+                  className="w-full p-4 rounded-lg bg-gradient-to-r from-blue-500 to-green-500 hover:opacity-90 transition-opacity text-left"
                 >
-                  <MessageSquare className="h-5 w-5 mr-3" />
-                  {isKidsMode ? "Discussion" : "Discussion"}
-                </Button>
-                
-                <Button
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <MessageSquare className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        Discussion
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        Deepen learning with AI and cultivate reflection skills to build intelligence through changing world information
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => handleLearningStart('output')}
-                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/25 border border-emerald-400/20"
+                  className="w-full p-4 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 hover:opacity-90 transition-opacity text-left"
                 >
-                  <FileText className="h-5 w-5 mr-3" />
-                  {isKidsMode ? "Action" : "Action"}
-                </Button>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <FileText className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        Action
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        自分にできるアクションや提案をまとめる
+                      </p>
+                    </div>
+                  </div>
+                </button>
               </div>
               
               <Button
                 variant="ghost"
                 onClick={() => setShowLearningOptions(false)}
-                className="w-full mt-6 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+                className="w-full mt-4 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
               >
                 {isKidsMode ? "キャンセル" : "キャンセル"}
               </Button>

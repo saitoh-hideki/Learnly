@@ -7,43 +7,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// カテゴリ別の日本語名マッピング
-const categoryNames: { [key: string]: string } = {
-  'technology': 'テクノロジー・IT・AI',
-  'science': '科学・研究',
-  'business': 'ビジネス・経済',
-  'health': '健康・医療',
-  'society': '社会・政治',
-  'politics': '政治・国際',
-  'economics': '経済・金融',
-  'environment': '環境・気候',
-  'education': '教育・学習',
-  'lifestyle': 'ライフスタイル'
-}
-
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { topic, topics } = await req.json()
-    
-    console.log('Received request with:', { topic, topics })
-    
-    // トピックの処理 - 複数のトピックをサポート
-    let searchTopics: string[] = []
-    if (topic && typeof topic === 'string') {
-      searchTopics = [topic]
-    } else if (topics && Array.isArray(topics) && topics.length > 0) {
-      searchTopics = topics
-    } else {
-      return new Response(
-        JSON.stringify({ error: 'Topic or topics parameter is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     // Supabaseクライアントを作成
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -57,21 +26,21 @@ serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 指定されたトピックのRSSソースを取得
+    // educationカテゴリのRSSソースを取得
     const { data: sources, error: sourcesError } = await supabase
       .from('rss_sources')
       .select('*')
-      .in('category', searchTopics)
+      .eq('category', 'education')
       .eq('active', true)
 
     if (sourcesError || !sources || sources.length === 0) {
       return new Response(
-        JSON.stringify({ error: `No RSS sources found for topics: ${searchTopics.join(', ')}` }),
+        JSON.stringify({ error: 'No RSS sources found for education category' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`Processing ${sources.length} RSS sources for topics: ${searchTopics.join(', ')}`)
+    console.log(`Processing ${sources.length} RSS sources for education category`)
 
     const allArticles: any[] = []
     const errors: string[] = []
@@ -104,9 +73,9 @@ serve(async (req: Request) => {
               summary: generateSummary(article.description || article.title),
               url: article.link,
               source: source.source_name,
-              category: source.category,
+              category: 'education',
               published_at: article.pubDate,
-              topics: [source.category],
+              topics: ['education'],
             })
 
           if (insertError) {
@@ -118,8 +87,7 @@ serve(async (req: Request) => {
               summary: generateSummary(article.description || article.title),
               url: article.link,
               source: source.source_name,
-              category: source.category,
-              categoryName: categoryNames[source.category] || source.category,
+              category: 'education',
               published_at: article.pubDate,
             })
             console.log(`Successfully inserted article: ${article.title}`)
@@ -132,7 +100,7 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`News fetch completed. Articles: ${allArticles.length}, Errors: ${errors.length}`)
+    console.log(`Education RSS fetch completed. Articles: ${allArticles.length}, Errors: ${errors.length}`)
 
     return new Response(
       JSON.stringify({
@@ -140,17 +108,17 @@ serve(async (req: Request) => {
         articles: allArticles,
         totalArticles: allArticles.length,
         errors: errors.length > 0 ? errors : undefined,
-        topics: searchTopics,
+        category: 'education',
         sourcesProcessed: sources.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error: any) {
-    console.error('News fetch function error:', error)
+    console.error('Education RSS fetch function error:', error)
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to fetch news',
+        error: 'Failed to fetch education RSS news',
         details: error.message 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

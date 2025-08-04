@@ -173,12 +173,16 @@ export default function NewsStockPage() {
   const handleLearningStart = (action: 'deep-dive' | 'chat' | 'output') => {
     if (!selectedNews) return
 
-    // 選択されたニュースをセッションストレージに保存
-    sessionStorage.setItem('selectedNews', JSON.stringify(selectedNews))
-    sessionStorage.setItem('learningAction', action)
-
-    // チャットページに遷移
-    router.push('/chat/news-learning')
+    if (action === 'deep-dive') {
+      // Deep Reviewページに遷移
+      router.push(`/deep-review?newsId=${selectedNews.id}`)
+    } else if (action === 'chat') {
+      // Discussionページに遷移
+      router.push(`/chat/discussion?newsId=${selectedNews.id}`)
+    } else if (action === 'output') {
+      // Actionページに遷移
+      router.push(`/chat/action?newsId=${selectedNews.id}`)
+    }
   }
 
   const getCategoryColor = (category: string) => {
@@ -521,37 +525,70 @@ export default function NewsStockPage() {
                   <Sparkles className="h-6 w-6 text-blue-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-white">
-                  {isKidsMode ? "べんきょうの しかたを えらぼう" : "学習方法を選択"}
+                  {isKidsMode ? "べんきょうの しかたを えらぼう" : "A New Form of Learning: Building Intelligence Through Information in a Changing World"}
                 </h3>
                 <p className="text-sm text-slate-400 mt-2">
-                  {isKidsMode ? "あなたに ぴったりの 学習方法を えらんでね" : "Choose the learning method that suits you best"}
+                  {isKidsMode ? "あなたに ぴったりの 学習方法を えらんでね" : "AIと共に学びを深め、自らの言葉で振り返る力を育む"}
                 </p>
               </div>
               
-              <div className="space-y-3">
-                <Button
+              <div className="space-y-4">
+                <button
                   onClick={() => handleLearningStart('deep-dive')}
-                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/25 border border-blue-400/20"
+                  className="w-full p-4 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 hover:opacity-90 transition-opacity text-left"
                 >
-                  <BookOpen className="h-5 w-5 mr-3" />
-                  {isKidsMode ? "Deep Review" : "Deep Review"}
-                </Button>
-                
-                <Button
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        Deep Review
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        ニュースの要約と関連情報を収集して多面的に深く理解
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => handleLearningStart('chat')}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 border border-purple-400/20"
+                  className="w-full p-4 rounded-lg bg-gradient-to-r from-blue-500 to-green-500 hover:opacity-90 transition-opacity text-left"
                 >
-                  <MessageSquare className="h-5 w-5 mr-3" />
-                  {isKidsMode ? "Discussion" : "Discussion"}
-                </Button>
-                
-                <Button
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <MessageSquare className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        Discussion
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        Deepen learning with AI and cultivate reflection skills to build intelligence through changing world information
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => handleLearningStart('output')}
-                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium px-4 py-3 rounded-lg hover:scale-[1.02] transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/25 border border-emerald-400/20"
+                  className="w-full p-4 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 hover:opacity-90 transition-opacity text-left"
                 >
-                  <FileText className="h-5 w-5 mr-3" />
-                  {isKidsMode ? "Action" : "Action"}
-                </Button>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <FileText className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        Action
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        自分にできるアクションや提案をまとめる
+                      </p>
+                    </div>
+                  </div>
+                </button>
               </div>
               
               <Button

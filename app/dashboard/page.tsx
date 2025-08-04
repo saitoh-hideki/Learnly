@@ -88,8 +88,9 @@ export default function DashboardPage() {
       console.log('Navigating to /theme-selection')
       router.push('/theme-selection')
     } else {
-      console.log('Navigating to /chat/${mode.id}')
-      router.push(`/chat/${mode.id}`)
+      // 9つのカテゴリーの場合は、カテゴリー別ニュースページに遷移
+      console.log('Navigating to /category/${mode.id}')
+      router.push(`/category/${mode.id}`)
     }
   }
 

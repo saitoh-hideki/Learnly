@@ -76,27 +76,50 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { currentSession, createSession, addMessage, saveReview } = useStore()
 
-  const mode = learningModes.find(m => m.id === modeId)
+  // 学習方法の定義
+  const learningMethods = {
+    'discussion': {
+      name: 'Discussion',
+      description: 'AIと対話しながら深く学び、振り返る力を育む',
+      icon: Sparkles,
+      initialPrompt: 'このニュースについて、AIと対話しながら深く学び、振り返る力を育みましょう。'
+    },
+    'action': {
+      name: 'Action',
+      description: '自分にできるアクションや提案をまとめる',
+      icon: FileText,
+      initialPrompt: 'このニュースについて、自分にできるアクションや提案をまとめましょう。'
+    }
+  }
+
+  const mode = learningModes.find(m => m.id === modeId) || learningMethods[modeId as keyof typeof learningMethods]
 
   useEffect(() => {
     if (mode && !currentSession) {
-      createSession(mode.id)
+      // 学習方法の場合はmodeIdをそのまま使用、そうでなければmode.idを使用
+      const sessionId = 'id' in mode ? mode.id : modeId
+      createSession(sessionId)
     }
-  }, [mode, currentSession])
+  }, [mode, currentSession, modeId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // クエリパラメータから選択されたニュースを取得（自動チャット開始はしない）
+  // クエリパラメータから選択されたニュースを取得
   useEffect(() => {
     const newsIds = searchParams.get('newsIds')
+    const newsId = searchParams.get('newsId')
     const category = searchParams.get('category')
     
     if (newsIds && !hasInitialized && currentSession) {
       setHasInitialized(true)
       // 選択されたニュースを取得
       fetchSelectedNews(newsIds.split(','))
+    } else if (newsId && !hasInitialized && currentSession) {
+      setHasInitialized(true)
+      // 単一のニュースを取得
+      fetchSelectedNews([newsId])
     }
   }, [searchParams, hasInitialized, currentSession])
 
@@ -107,6 +130,25 @@ export default function ChatPage() {
         const { savedNews } = await response.json()
         const selected = savedNews.filter((news: any) => newsIds.includes(news.id))
         setSelectedNews(selected)
+        
+        // 学習方法の場合、初期メッセージを自動送信
+        if (learningMethods[modeId as keyof typeof learningMethods] && selected.length > 0) {
+          const method = learningMethods[modeId as keyof typeof learningMethods]
+          const initialMessage = `${method.initialPrompt}\n\n選択されたニュース:\n${selected.map((article: any, index: number) => 
+            `【${index + 1}】${article.title}\n${article.summary}`
+          ).join('\n\n')}`
+          
+          // 初期メッセージを自動送信
+          setTimeout(() => {
+            setInput(initialMessage)
+            // sendMessageは引数を取らないので、inputを設定してから呼び出す
+            setInput(initialMessage)
+            // 次のレンダリングサイクルでsendMessageを呼び出す
+            setTimeout(() => {
+              sendMessage()
+            }, 100)
+          }, 1000)
+        }
       }
     } catch (error) {
       console.error('Error fetching selected news:', error)
@@ -256,7 +298,13 @@ export default function ChatPage() {
             </Button>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-br from-sky-500/10 to-indigo-500/10 rounded-xl">
-                <span className="text-2xl">{mode.icon}</span>
+                {'icon' in mode && typeof mode.icon === 'string' ? (
+                  <span className="text-2xl">{mode.icon}</span>
+                ) : 'icon' in mode && typeof mode.icon === 'function' ? (
+                  <mode.icon className="h-6 w-6 text-white" />
+                ) : (
+                  <BookOpen className="h-6 w-6 text-white" />
+                )}
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-white">{mode.name}</h1>

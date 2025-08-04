@@ -2,26 +2,41 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, MessageSquare, FileText, ExternalLink, BookOpen, Search, Zap, Check } from 'lucide-react'
+import { ArrowLeft, BookOpen, MessageSquare, FileText, X, Clock, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { supabase } from '@/lib/supabase'
-import { learningModes } from '@/data/modes'
+import { Header } from '@/components/ui/header'
+import { useStore } from '@/store/useStore'
+import { useLabels } from '@/lib/kidsLabels'
 
-interface SavedNews {
-  id: string
-  title: string
-  summary: string
-  url: string
-  source: string
-  category: string
-  published_at: string
-  topics: string[]
-  created_at: string
-}
+// 学習方法の定義
+const learningMethods = [
+  {
+    id: 'deep-review',
+    name: 'Deep Review',
+    description: 'ニュースの要約と関連情報を収集して多面的に深く理解',
+    icon: BookOpen,
+    gradient: 'from-blue-500 to-cyan-500'
+  },
+  {
+    id: 'discussion',
+    name: 'Discussion',
+    description: 'Deepen learning with AI and cultivate reflection skills to build intelligence through changing world information',
+    icon: MessageSquare,
+    gradient: 'from-blue-500 to-green-500'
+  },
+  {
+    id: 'action',
+    name: 'Action',
+    description: '自分にできるアクションや提案をまとめる',
+    icon: FileText,
+    gradient: 'from-pink-500 to-purple-500'
+  }
+]
 
-const topicNames: { [key: string]: string } = {
+// カテゴリー名の日本語変換マップ
+const categoryNames: { [key: string]: string } = {
   'business': 'ビジネス・経営',
   'technology': 'テクノロジー・IT',
   'economics': '経済・金融',
@@ -33,38 +48,46 @@ const topicNames: { [key: string]: string } = {
   'lifestyle': '文化・ライフスタイル'
 }
 
-export default function CategoryPage() {
+// ニュースの型定義
+interface NewsItem {
+  id: string
+  title: string
+  summary: string
+  url: string
+  source: string
+  category: string
+  published_at: string
+  created_at: string
+}
+
+export default function CategoryNewsPage() {
   const router = useRouter()
   const params = useParams()
   const categoryId = params.categoryId as string
+  const { isKidsMode } = useStore()
+  const labels = useLabels(isKidsMode)
   
-  const [savedNews, setSavedNews] = useState<SavedNews[]>([])
-  const [selectedNewsIds, setSelectedNewsIds] = useState<string[]>([])
+  const [savedNews, setSavedNews] = useState<NewsItem[]>([])
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null)
+  const [showLearningModal, setShowLearningModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
-
-  const category = learningModes.find(mode => mode.id === categoryId)
 
   useEffect(() => {
-    setMounted(true)
-    fetchCategoryNews()
+    fetchSavedNewsByCategory()
   }, [categoryId])
 
-  const fetchCategoryNews = async () => {
+  const fetchSavedNewsByCategory = async () => {
     try {
       setIsLoading(true)
-
       const response = await fetch('/api/saved-news')
-
+      
       if (response.ok) {
         const { savedNews } = await response.json()
-        // 該当カテゴリのニュースのみフィルタリング
-        const categoryNews = savedNews.filter((news: SavedNews) => 
-          news.category === categoryId || news.topics.includes(categoryId)
+        // カテゴリーでフィルタリング
+        const filteredNews = savedNews.filter((news: NewsItem) => 
+          news.category === categoryId
         )
-        setSavedNews(categoryNews)
-      } else {
-        console.error('Failed to fetch saved news')
+        setSavedNews(filteredNews)
       }
     } catch (error) {
       console.error('Error fetching saved news:', error)
@@ -73,221 +96,223 @@ export default function CategoryPage() {
     }
   }
 
-  const handleNewsSelect = (newsId: string) => {
-    setSelectedNewsIds(prev => {
-      if (prev.includes(newsId)) {
-        return prev.filter(id => id !== newsId)
-      } else {
-        if (prev.length >= 5) {
-          return prev // 最大5件まで
-        }
-        return [...prev, newsId]
+  const handleNewsSelect = (news: NewsItem) => {
+    setSelectedNews(news)
+    setShowLearningModal(true)
+  }
+
+  const handleLearningMethodSelect = (methodId: string) => {
+    if (selectedNews) {
+      // Deep Reviewの場合はDeep Reviewページに遷移、その他はチャットページに遷移
+      if (methodId === 'deep-review') {
+        router.push(`/deep-review?newsId=${selectedNews.id}`)
+      } else if (methodId === 'discussion') {
+        router.push(`/chat/discussion?newsId=${selectedNews.id}`)
+      } else if (methodId === 'action') {
+        router.push(`/chat/action?newsId=${selectedNews.id}`)
       }
+    }
+  }
+
+  const handleBack = () => {
+    router.push('/dashboard')
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     })
   }
 
-  const handleStartLearning = () => {
-    if (selectedNewsIds.length === 0) return
-    
-    const selectedArticles = savedNews.filter(news => selectedNewsIds.includes(news.id))
-    const initialPrompt = selectedArticles.map((article, index) =>
-      `【${index + 1}】${article.title}\n${article.summary}`
-    ).join('\n\n')
-    
-    const queryParams = new URLSearchParams({
-      category: categoryId,
-      newsIds: selectedNewsIds.join(','),
-      initialPrompt: initialPrompt
-    })
-    
-    router.push(`/chat/${categoryId}?${queryParams.toString()}`)
+  const truncateSummary = (summary: string, maxLength: number = 100) => {
+    if (summary.length <= maxLength) return summary
+    return summary.substring(0, maxLength) + '...'
   }
 
-  if (!mounted) {
-    return null
-  }
-
-  if (!category) {
-    return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">カテゴリが見つかりません</h1>
-          <Button onClick={() => router.push('/dashboard')}>
-            ダッシュボードに戻る
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  const categoryName = categoryNames[categoryId] || categoryId
 
   return (
-    <div className="min-h-screen bg-[#0d1117]">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push('/dashboard')}
-              className="hover:bg-gray-800 rounded-xl text-gray-300 hover:text-white"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="text-4xl">{category.icon}</div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">{category.name}</h1>
-                <p className="text-gray-400">AIと対話して学習</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#0e1a2a] relative overflow-hidden">
+      <Header title={labels.dashboardTitle} />
+      
+      {/* Enhanced Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-sky-500/8 to-transparent"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-t from-blue-600/5 to-transparent rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-br from-indigo-500/3 to-purple-500/3 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8 relative z-10">
+        {/* Breadcrumb */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+            <span className="cursor-pointer hover:text-white" onClick={handleBack}>
+              ホーム
+            </span>
+            <span>/</span>
+            <span>ニュースで学ぶ</span>
+          </div>
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            ← 戻る
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-8 max-w-md">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Q ニュースを検索"
+              className="w-full pl-4 pr-10 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+            />
           </div>
         </div>
 
-        {/* Sub Navigation */}
+        {/* Category News Section */}
         <div className="mb-8">
-          <div className="flex gap-4">
-            <Button
-              variant="outline"
-              onClick={() => router.push('/review-stock')}
-              className="border-gray-600 hover:border-indigo-400 text-gray-300 hover:text-indigo-400"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              保存済みレビュー
-            </Button>
-            <Button
-              variant="outline"
-              disabled
-              className="border-gray-600 text-gray-500 cursor-not-allowed"
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              レビュー生成
-            </Button>
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="mb-12">
-          <Card className="bg-gradient-to-r from-sky-500/10 to-indigo-500/10 border border-gray-700 shadow-xl rounded-3xl p-8 text-center">
-            <div className="text-6xl mb-6">{category.icon}</div>
-            <h2 className="text-2xl font-bold text-white mb-4">
-              {category.name}について学習を始めましょう
-            </h2>
-            <p className="text-gray-300 text-lg leading-relaxed max-w-2xl mx-auto">
-              {category.description}
-            </p>
-            <div className="mt-6">
-              <Button
-                onClick={handleStartLearning}
-                disabled={selectedNewsIds.length === 0}
-                className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white rounded-xl shadow-md px-8 py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <MessageSquare className="h-5 w-5 mr-2" />
-                {selectedNewsIds.length > 0 ? `${selectedNewsIds.length}件のニュースで学習を始める` : 'ニュースを選択してください'}
-              </Button>
-            </div>
-          </Card>
-        </div>
-
-        {/* News History Slider */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              ニュース履歴
-            </h3>
-            <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="text-sm">
-                {savedNews.length} 件
-              </Badge>
-              {selectedNewsIds.length > 0 && (
-                <Badge variant="outline" className="text-sm border-green-600 text-green-400 bg-green-500/10">
-                  {selectedNewsIds.length}/5 選択中
-                </Badge>
-              )}
-            </div>
-          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">
+            選択したカテゴリー「{categoryName}」の最新ニュース
+          </h2>
+          <p className="text-slate-400 mb-6">
+            {savedNews.length}件の最新ニュースがあります（気に入ったものは保存ポ）
+          </p>
 
           {isLoading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500 mx-auto"></div>
-              <p className="text-gray-400 mt-2">読み込み中...</p>
+              <div className="text-slate-400">読み込み中...</div>
             </div>
           ) : savedNews.length === 0 ? (
-            <Card className="bg-[#1c1f26] border border-gray-700 shadow-xl rounded-2xl">
-              <CardContent className="py-12 text-center">
-                <BookOpen className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-300 mb-2">ニュース履歴がありません</h3>
-                <p className="text-gray-400 mb-6">
-                  このカテゴリのニュースを保存すると、ここに表示されます
-                </p>
-                <Button
-                  onClick={() => router.push('/news-dashboard')}
-                  className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white hover:from-sky-600 hover:to-indigo-600"
-                >
-                  ニュースを見る
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <div className="flex gap-4 pb-4 min-w-max">
-                {savedNews.slice(0, 10).map((news) => (
-                  <Card
-                    key={news.id}
-                    className={`cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2 ${
-                      selectedNewsIds.includes(news.id)
-                        ? 'border-green-500 bg-green-500/10 shadow-lg'
-                        : 'border-gray-700 hover:border-sky-400 bg-[#1c1f26] hover:shadow-lg'
-                    } rounded-2xl min-w-[320px] max-w-[320px]`}
-                    onClick={() => handleNewsSelect(news.id)}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full">
-                            {topicNames[news.category] || news.category}
-                          </Badge>
-                          <span className="text-xs text-gray-400">{news.source}</span>
-                        </div>
-                        {selectedNewsIds.includes(news.id) && (
-                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                            <Check className="h-4 w-4 text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <CardTitle className="text-sm font-semibold text-white line-clamp-2 leading-tight">
-                        {news.title}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <CardDescription className="text-xs text-gray-400 line-clamp-3 mb-3">
-                        {news.summary}
-                      </CardDescription>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <span>保存: {new Date(news.created_at).toLocaleDateString('ja-JP')}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            window.open(news.url, '_blank')
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300 p-0 h-auto"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+            <div className="text-center py-8">
+              <div className="text-slate-400 mb-2">
+                {isKidsMode ? "まだ ニュースが ほぞんされていないよ" : "まだニュースが保存されていません"}
               </div>
+              <div className="text-slate-500 text-sm">
+                {isKidsMode ? "ニュースダッシュボードで きじを ほぞんしよう" : "ニュースダッシュボードで記事を保存しましょう"}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {savedNews.map((news) => (
+                <Card
+                  key={news.id}
+                  className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300 cursor-pointer group"
+                  onClick={() => handleNewsSelect(news)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-white text-lg mb-2 line-clamp-2">
+                          {news.title}
+                        </CardTitle>
+                        <CardDescription className="text-slate-400 text-sm mb-3 line-clamp-3">
+                          {truncateSummary(news.summary, 120)}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
+                        {categoryNames[news.category] || news.category}
+                      </Badge>
+                      {news.source && (
+                        <Badge variant="secondary" className="bg-slate-600/50 text-slate-300">
+                          {news.source}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-slate-400 text-sm">
+                        <Clock className="h-4 w-4" />
+                        {formatDate(news.published_at)}
+                      </div>
+                      <ExternalLink className="h-4 w-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </div>
+
+        {/* Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">通常モード</span>
+            <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
+              <span className="text-slate-300 text-sm">👤</span>
+            </div>
+          </div>
+          <Button
+            onClick={fetchSavedNewsByCategory}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            更新
+          </Button>
+        </div>
       </div>
+
+      {/* Learning Method Selection Modal */}
+      {showLearningModal && selectedNews && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">学習方法を選択</h3>
+              <button
+                onClick={() => setShowLearningModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <p className="text-slate-400 mb-6">
+              ニュースを選んで学習を始めましょう
+            </p>
+
+            <div className="space-y-4">
+              {learningMethods.map((method) => (
+                <button
+                  key={method.id}
+                  onClick={() => handleLearningMethodSelect(method.id)}
+                  className={`w-full p-4 rounded-lg bg-gradient-to-r ${method.gradient} hover:opacity-90 transition-opacity text-left`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <method.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold text-lg mb-1">
+                        {method.name}
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        {method.description}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => setShowLearningModal(false)}
+                variant="outline"
+                className="border-slate-600 text-slate-400 hover:bg-slate-700"
+              >
+                キャンセル
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

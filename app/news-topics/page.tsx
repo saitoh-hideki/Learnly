@@ -113,6 +113,8 @@ export default function NewsTopicsPage() {
   const [latestNews, setLatestNews] = useState<Record<string, LatestNews>>({})
   const [errorMessage, setErrorMessage] = useState<string>('')
   const [processingStatus, setProcessingStatus] = useState<string>('')
+  const [savedNews, setSavedNews] = useState<any[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
@@ -129,10 +131,33 @@ export default function NewsTopicsPage() {
     return colors[category] || 'text-slate-300'
   }
 
-  // ページ読み込み時に選択をクリア
+  // URLパラメータからカテゴリーを取得し、保存済みニュースを取得
   useEffect(() => {
-    setSelectedTopics([])
+    const urlParams = new URLSearchParams(window.location.search)
+    const category = urlParams.get('category')
+    
+    if (category) {
+      setSelectedCategory(category)
+      setSelectedTopics([category])
+      fetchSavedNewsByCategory(category)
+    } else {
+      setSelectedTopics([])
+    }
   }, [])
+
+  // 指定されたカテゴリーの保存済みニュースを取得
+  const fetchSavedNewsByCategory = async (category: string) => {
+    try {
+      const response = await fetch('/api/saved-news')
+      if (response.ok) {
+        const { savedNews } = await response.json()
+        const filteredNews = savedNews.filter((news: any) => news.category === category)
+        setSavedNews(filteredNews)
+      }
+    } catch (error) {
+      console.error('Error fetching saved news:', error)
+    }
+  }
 
   // 各カテゴリーの最新取得日と最新ニュースを取得（現在は無効化）
   // useEffect(() => {
@@ -176,11 +201,6 @@ export default function NewsTopicsPage() {
     setProcessingStatus('')
 
     try {
-      // エッジファンクションを呼び出して最新ニュースを取得
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
       console.log('Selected topics:', selectedTopics)
 
       // 選択された1つのトピックのニュースを取得
@@ -189,133 +209,22 @@ export default function NewsTopicsPage() {
         ? labels.categories[topic as keyof typeof labels.categories] || topic
         : topicNames[topic] || topic
       
-      setProcessingStatus(`${topicName}のニュースを取得中...`)
+      setProcessingStatus(`${topicName}のニュースを準備中...`)
       console.log(`Processing topic: ${topic}`)
       
-      let retryCount = 0
-      const maxRetries = 3
-      let success = false
+      // 直接ニュースダッシュボードに遷移
+      console.log('Preparing to redirect to news dashboard...')
+      setProcessingStatus('ニュースダッシュボードに移動中...')
       
-      while (retryCount < maxRetries && !success) {
-        try {
-          console.log(`Attempt ${retryCount + 1} for topic ${topic}`)
-          
-          const { data, error } = await supabase.functions.invoke('fetch-news', {
-            body: { topic: topic } // 単一のトピックとして送信
-          })
-
-          if (error) {
-            console.error(`Supabase function error for topic ${topic} (attempt ${retryCount + 1}):`, error)
-            console.error('Error details:', {
-              message: error.message,
-              name: error.name,
-              status: error.status,
-              statusText: error.statusText,
-              details: error.details,
-              context: error.context,
-              stack: error.stack
-            })
-            
-            // エラーレスポンスの詳細を取得
-            try {
-              const errorResponse = await error.response?.text()
-              console.error('Error response body:', errorResponse)
-            } catch (responseError) {
-              console.error('Could not read error response:', responseError)
-            }
-            retryCount++
-            if (retryCount < maxRetries) {
-              setProcessingStatus(`${topicName}のニュース取得を再試行中... (${retryCount}/${maxRetries})`)
-              console.log(`Retrying topic ${topic} in 2 seconds...`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              continue
-            } else {
-              console.error(`Failed to fetch news for topic ${topic} after ${maxRetries} attempts`)
-              setErrorMessage(`${topicName}のニュース取得に失敗しました: ${error.message}`)
-              break
-            }
-          }
-
-          console.log(`Successfully fetched data for topic ${topic}:`, data)
-
-                      if (data && data.articles) {
-              setProcessingStatus(`${topicName}のニュースを取得中...`)
-              console.log(`Retrieved ${data.articles.length} articles for topic ${topic}`)
-              
-              // データベースの保存を待つ
-              console.log('Waiting for database save...')
-              await new Promise(resolve => setTimeout(resolve, 3000)) // 3秒待機
-              
-              // データベースに保存されているか確認
-              console.log('Checking if articles were saved to database...')
-              try {
-                const checkResponse = await fetch(`/api/latest-news?category=${encodeURIComponent(topic)}`)
-                if (checkResponse.ok) {
-                  const checkData = await checkResponse.json()
-                  console.log(`Database check result: ${checkData.news?.length || 0} articles found in database`)
-                } else {
-                  console.log('Database check failed:', checkResponse.status)
-                }
-              } catch (checkError) {
-                console.error('Error checking database:', checkError)
-              }
-              
-              success = true
-            } else {
-              console.warn(`No articles found for topic ${topic}`)
-              // 記事が見つからない場合でも成功として扱う
-              success = true
-            }
-          
-        } catch (topicError) {
-          console.error(`Error processing topic ${topic} (attempt ${retryCount + 1}):`, topicError)
-          retryCount++
-          if (retryCount < maxRetries) {
-            setProcessingStatus(`${topicName}の処理を再試行中... (${retryCount}/${maxRetries})`)
-            console.log(`Retrying topic ${topic} in 2 seconds...`)
-            await new Promise(resolve => setTimeout(resolve, 2000))
-          } else {
-            console.error(`Failed to process topic ${topic} after ${maxRetries} attempts`)
-            setErrorMessage(`${topicName}の処理に失敗しました`)
-            break
-          }
-        }
-      }
-
-      // 成功した場合のみ遷移
-      if (success) {
-        console.log('News processing completed successfully, redirecting to news dashboard')
-        setProcessingStatus('ニュースダッシュボードに移動中...')
-        
-        // データベースの更新が確実に反映されるように長めに待機
-        console.log('Waiting for database update to complete...')
-        await new Promise(resolve => setTimeout(resolve, 3000))
-        
-        // 最終確認：データベースにニュースが保存されているかチェック
-        console.log('Final database check before redirect...')
-        try {
-          const finalCheckResponse = await fetch(`/api/latest-news?category=${encodeURIComponent(selectedTopics[0])}`)
-          if (finalCheckResponse.ok) {
-            const finalCheckData = await finalCheckResponse.json()
-            console.log(`Final database check: ${finalCheckData.news?.length || 0} articles ready for display`)
-          }
-        } catch (finalCheckError) {
-          console.error('Final database check error:', finalCheckError)
-        }
-        
-        console.log('Redirecting to /news-dashboard...')
-        console.log('Current selected news topics:', selectedTopics)
-        
-        // ストアの状態が確実に更新されるように少し待ってから遷移
-        await new Promise(resolve => setTimeout(resolve, 500))
-        router.replace('/news-dashboard')
-      } else {
-        console.log('News processing failed, not redirecting')
-        setErrorMessage('ニュースの取得に失敗しました。もう一度お試しください。')
-      }
+      // 最小限の待機時間
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log('Redirecting to /news-dashboard...')
+      router.replace('/news-dashboard')
+      
     } catch (error) {
-      console.error('Error fetching news:', error)
-      setErrorMessage('ニュースの取得中にエラーが発生しました')
+      console.error('Error in handleContinue:', error)
+      setErrorMessage('処理中にエラーが発生しました')
     } finally {
       setIsLoading(false)
       console.log('=== handleContinue completed ===')
@@ -349,171 +258,258 @@ export default function NewsTopicsPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8 relative z-10">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="text-slate-300 hover:text-white mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {isKidsMode ? "もどる" : "戻る"}
-          </Button>
-          
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-              <Sparkles className="h-8 w-8 text-blue-400" />
-              {labels.newsTopics}
-            </h1>
-            <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              {isKidsMode 
-                ? "きょうみのある カテゴリーを 1つ えらんでね。6件以上の ニュースを とって、きにいったものは 保存ボタンで のこそう！" 
-                : "Select a category that interests you and let's get the news!"
-              }
-            </p>
-          </div>
-        </div>
-
-        {/* Selection Info */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-slate-800/50 border border-slate-600 rounded-full px-6 py-3">
-            <Check className="h-5 w-5 text-green-400" />
-            <span className="text-white">
-              {isKidsMode 
-                ? `${selectedTopics.length}/1 の テーマを えらんだよ` 
-                : `${selectedTopics.length}/1 のテーマを選択中`
-              }
-            </span>
-          </div>
-        </div>
-
-        {/* Topics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {newsTopics.map((topic) => {
-            const isSelected = selectedTopics.includes(topic.id)
-            const latestNewsItem = latestNews[topic.id]
-            const lastFetchDate = lastFetchDates[topic.id]
+        <div>
+          {/* Header */}
+          <div className="mb-8">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="text-slate-300 hover:text-white mb-4"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {isKidsMode ? "もどる" : "戻る"}
+            </Button>
             
-            return (
-              <Card
-                key={topic.id}
-                className={`cursor-pointer transition-all duration-300 ${
-                  isSelected 
-                    ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-blue-500 shadow-lg shadow-blue-500/20 transform scale-105 hover:scale-110' 
-                    : 'bg-slate-800/50 border-slate-600 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 hover:scale-105'
-                }`}
-                onClick={() => handleTopicToggle(topic.id)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{topic.icon}</span>
-                      <div>
-                        <CardTitle className={`text-lg ${getCategoryColor(topic.id)}`}>
-                          {isKidsMode 
-                            ? labels.categories[topic.id as keyof typeof labels.categories] || topic.name
-                            : topic.name
-                          }
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-white mb-4 flex items-center justify-center gap-3">
+                <Sparkles className="h-8 w-8 text-blue-400" />
+                {selectedCategory ? labels.newsLearning : labels.newsTopics}
+              </h1>
+              <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                {selectedCategory 
+                  ? (isKidsMode 
+                      ? "えらんだ カテゴリーの ほぞんした ニュースを みてみよう！" 
+                      : "Select the latest news from your chosen category and start learning! Save interesting articles with the bookmark button.")
+                  : (isKidsMode 
+                      ? "きょうみのある カテゴリーを 1つ えらんでね。6件以上の ニュースを とって、きにいったものは 保存ボタンで のこそう！" 
+                      : "Select a category that interests you and let's get the news!")
+                }
+              </p>
+            </div>
+          </div>
+          
+          {/* Selection Info */}
+          {!selectedCategory && (
+            <div className="mb-8 text-center">
+              <div className="inline-flex items-center gap-2 bg-slate-800/50 border border-slate-600 rounded-full px-6 py-3">
+                <Check className="h-5 w-5 text-green-400" />
+                <span className="text-white">
+                  {isKidsMode 
+                    ? `${selectedTopics.length}/1 の テーマを えらんだよ` 
+                    : `${selectedTopics.length}/1 のテーマを選択中`
+                  }
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {/* Category Info Banner */}
+          {selectedCategory && (
+            <div className="mb-8">
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-6 w-6 text-blue-400" />
+                  <div>
+                    <p className="text-white font-medium">
+                      {isKidsMode 
+                        ? `えらんだ カテゴリー「${labels.categories[selectedCategory as keyof typeof labels.categories] || selectedCategory}」の ほぞんした ニュース`
+                        : `Latest news in the selected category "${labels.categories[selectedCategory as keyof typeof labels.categories] || selectedCategory}"`
+                      }
+                    </p>
+                    <p className="text-slate-300 text-sm">
+                      {isKidsMode 
+                        ? `${savedNews.length}件の ほぞんした ニュースがあります (きにいったものは ほぞんボタンで ほぞんできます)`
+                        : `There are ${savedNews.length} saved news articles (you can save your favorites with the save button)`
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Saved News Grid */}
+          {selectedCategory && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {savedNews.map((news) => (
+                <Card key={news.id} className="bg-slate-800/50 border-slate-600 hover:border-blue-500 transition-all duration-300">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-white text-lg mb-2 line-clamp-2">
+                          {news.title}
                         </CardTitle>
-                        <CardDescription className="text-slate-400">
-                          {topic.description}
+                        <CardDescription className="text-slate-400 text-sm line-clamp-3">
+                          {news.summary}
                         </CardDescription>
                       </div>
                     </div>
-                    {isSelected && (
-                      <div className="p-2 bg-blue-500 rounded-full animate-pulse">
-                        <Check className="h-4 w-4 text-white" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className={`${getCategoryColor(news.category)} bg-slate-700/50`}>
+                          {labels.categories[news.category as keyof typeof labels.categories] || news.category}
+                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 text-sm">{news.source}</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </CardHeader>
-                
-                <CardContent>
-                  <div className="space-y-3">
-                    {/* Examples */}
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">
-                        {isKidsMode ? "りれい" : "例"}
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {topic.examples.map((example, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs bg-slate-700/50 text-slate-300">
-                            {example}
-                          </Badge>
-                        ))}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-slate-400 text-sm">
+                          <Clock className="h-4 w-4" />
+                          {formatDate(news.published_at)}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-slate-400 hover:text-blue-400"
+                            onClick={() => window.open(news.url, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Latest News Preview */}
-                    {latestNewsItem && (
-                      <div className="border-t border-slate-600/50 pt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Clock className="h-3 w-3 text-slate-500" />
-                          <span className="text-xs text-slate-500">
-                            {isKidsMode ? "さいきんの ニュース" : "最新ニュース"}
-                          </span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          
+          {/* Topics Grid */}
+          {!selectedCategory && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {newsTopics.map((topic) => {
+              const isSelected = selectedTopics.includes(topic.id)
+              const latestNewsItem = latestNews[topic.id]
+              const lastFetchDate = lastFetchDates[topic.id]
+              
+              return (
+                <Card
+                  key={topic.id}
+                  className={`cursor-pointer transition-all duration-300 ${
+                    isSelected 
+                      ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-blue-500 shadow-lg shadow-blue-500/20 transform scale-105 hover:scale-110' 
+                      : 'bg-slate-800/50 border-slate-600 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 hover:scale-105'
+                  }`}
+                  onClick={() => handleTopicToggle(topic.id)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{topic.icon}</span>
+                        <div>
+                          <CardTitle className={`text-lg ${getCategoryColor(topic.id)}`}>
+                            {isKidsMode 
+                              ? labels.categories[topic.id as keyof typeof labels.categories] || topic.name
+                              : topic.name
+                            }
+                          </CardTitle>
+                          <CardDescription className="text-slate-400">
+                            {topic.description}
+                          </CardDescription>
                         </div>
-                        <p className="text-sm text-slate-300 line-clamp-2">
-                          {truncateSummary(latestNewsItem.title, 60)}
-                        </p>
-                        {lastFetchDate && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            {isKidsMode ? "さいきんの こうしん" : "最終更新"}: {formatDate(lastFetchDate)}
-                          </p>
-                        )}
                       </div>
-                    )}
+                      {isSelected && (
+                        <div className="p-2 bg-blue-500 rounded-full animate-pulse">
+                          <Check className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    <div className="space-y-3">
+                      {/* Examples */}
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">
+                          {isKidsMode ? "りれい" : "例"}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {topic.examples.map((example, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs bg-slate-700/50 text-slate-300">
+                              {example}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Latest News Preview */}
+                      {latestNewsItem && (
+                        <div className="border-t border-slate-600/50 pt-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Clock className="h-3 w-3 text-slate-500" />
+                            <span className="text-xs text-slate-500">
+                              {isKidsMode ? "さいきんの ニュース" : "最新ニュース"}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-300 line-clamp-2">
+                            {truncateSummary(latestNewsItem.title, 60)}
+                          </p>
+                          {lastFetchDate && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {isKidsMode ? "さいきんの こうしん" : "最終更新"}: {formatDate(lastFetchDate)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+          )}
+          
+          {/* Continue Button */}
+          {!selectedCategory && (
+            <div className="text-center">
+              {/* エラーメッセージ */}
+              {errorMessage && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-red-300 text-sm">
+                    <span>⚠️</span>
+                    <span>{errorMessage}</span>
                   </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Continue Button */}
-        <div className="text-center">
-          {/* エラーメッセージ */}
-          {errorMessage && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-center gap-2 text-red-300 text-sm">
-                <span>⚠️</span>
-                <span>{errorMessage}</span>
-              </div>
+                </div>
+              )}
+              
+              {/* 処理状況 */}
+              {processingStatus && (
+                <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-blue-300 text-sm">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-300 border-t-transparent"></div>
+                    <span>{processingStatus}</span>
+                  </div>
+                </div>
+              )}
+              
+              <Button
+                onClick={handleContinue}
+                disabled={selectedTopics.length === 0 || isLoading}
+                className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-8 py-3 rounded-xl text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    {isKidsMode ? "ニュースを よみこみちゅう..." : "ニュースを読み込み中..."}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {isKidsMode ? "べんきょうを スタート！" : "学習を始める"}
+                    <ArrowRight className="h-5 w-5" />
+                  </div>
+                )}
+              </Button>
+              
+              {selectedTopics.length === 0 && (
+                <p className="text-slate-400 mt-4">
+                  {isKidsMode ? "きょうみのある テーマを 1つ えらんでね" : "興味のあるテーマを1つ選択してください"}
+                </p>
+              )}
             </div>
-          )}
-          
-          {/* 処理状況 */}
-          {processingStatus && (
-            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <div className="flex items-center gap-2 text-blue-300 text-sm">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-300 border-t-transparent"></div>
-                <span>{processingStatus}</span>
-              </div>
-            </div>
-          )}
-          
-          <Button
-            onClick={handleContinue}
-            disabled={selectedTopics.length === 0 || isLoading}
-            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-8 py-3 rounded-xl text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105"
-          >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                {isKidsMode ? "ニュースを よみこみちゅう..." : "ニュースを読み込み中..."}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                {isKidsMode ? "べんきょうを スタート！" : "学習を始める"}
-                <ArrowRight className="h-5 w-5" />
-              </div>
-            )}
-          </Button>
-          
-          {selectedTopics.length === 0 && (
-            <p className="text-slate-400 mt-4">
-              {isKidsMode ? "きょうみのある テーマを 1つ えらんでね" : "興味のあるテーマを1つ選択してください"}
-            </p>
           )}
         </div>
       </div>

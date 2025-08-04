@@ -128,8 +128,22 @@ export default function NewsArchivePage() {
   const handleLearningStart = (action: 'deep-dive' | 'chat' | 'output') => {
     if (!selectedNews) return
     
-    // 一時的にダッシュボードにリダイレクト（後で専用ページを作成予定）
-    router.push('/dashboard')
+    switch (action) {
+      case 'deep-dive':
+        // 深掘り学習 - Deep Reviewページに遷移
+        router.push(`/deep-review?newsId=${selectedNews.id}`)
+        break
+      case 'chat':
+        // チャット学習 - チャットページに遷移
+        router.push(`/chat/discussion?newsId=${selectedNews.id}`)
+        break
+      case 'output':
+        // アウトプット - アクションページに遷移
+        router.push(`/chat/action?newsId=${selectedNews.id}`)
+        break
+      default:
+        router.push('/dashboard')
+    }
   }
 
   return (
