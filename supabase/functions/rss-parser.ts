@@ -1,3 +1,8 @@
+// CDATAタグを除去する関数
+export function removeCDATA(text: string): string {
+  return text.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim()
+}
+
 // XML要素を抽出する関数
 export function extractElement(text: string, tagName: string): string[] {
   const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'gi')
@@ -132,12 +137,16 @@ export async function parseRSS(url: string) {
 
 // HTMLタグを除去する関数
 export function stripHtmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '').trim()
+  return text
+    .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1') // CDATAタグを除去
+    .replace(/<[^>]*>/g, '') // HTMLタグを除去
+    .replace(/&[^;]+;/g, '') // HTMLエンティティを除去
+    .trim()
 }
 
 // 要約を生成する関数（簡易版）
 export function generateSummary(text: string, maxLength: number = 100): string {
-  const cleanText = stripHtmlTags(text)
+  const cleanText = stripHtmlTags(removeCDATA(text))
   if (cleanText.length <= maxLength) {
     return cleanText
   }

@@ -6,6 +6,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// CDATAタグを除去し、HTMLエンティティをデコードする関数
+function cleanText(text: string): string {
+  if (!text) return ''
+  
+  // CDATAタグを除去
+  let cleaned = text.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+  
+  // HTMLエンティティをデコード
+  cleaned = cleaned.replace(/&amp;/g, '&')
+  cleaned = cleaned.replace(/&lt;/g, '<')
+  cleaned = cleaned.replace(/&gt;/g, '>')
+  cleaned = cleaned.replace(/&quot;/g, '"')
+  cleaned = cleaned.replace(/&#39;/g, "'")
+  cleaned = cleaned.replace(/&nbsp;/g, ' ')
+  
+  // 余分な空白を除去
+  cleaned = cleaned.trim()
+  
+  return cleaned
+}
+
 // XML要素を抽出する関数
 function extractElement(text: string, tagName: string): string[] {
   const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'gi')
@@ -14,7 +35,7 @@ function extractElement(text: string, tagName: string): string[] {
   
   return matches.map(match => {
     const contentMatch = match.match(new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i'))
-    return contentMatch ? contentMatch[1].trim() : ''
+    return contentMatch ? cleanText(contentMatch[1]) : ''
   }).filter(content => content.length > 0)
 }
 
@@ -26,7 +47,7 @@ function extractElementWithAttribute(text: string, tagName: string, attribute: s
   
   return matches.map(match => {
     const attrMatch = match.match(new RegExp(`${attribute}="([^"]*)"`, 'i'))
-    return attrMatch ? attrMatch[1].trim() : ''
+    return attrMatch ? cleanText(attrMatch[1]) : ''
   }).filter(content => content.length > 0)
 }
 
